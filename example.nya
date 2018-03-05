@@ -1,0 +1,55 @@
+
+class Animal {
+
+	
+	# Constructor
+	New() {
+	
+	}
+	
+	# Static constructor?
+	New! {
+	
+	}
+	
+	@public @virtual
+	Foo() {
+	
+	}
+	
+	@public
+	Bar() {
+		unless (1 > 2) {
+			DoSomething()
+		}
+	}
+}
+
+# Comments
+class Cat << Animal {
+
+	int hairs = 9001
+	string call = null
+
+	# TODO: Immutable (ie. const/readonly)
+	# int legs = 4
+
+	@override
+	Foo(string message, string s1? = "derp", string s2?) {
+		
+	}
+
+	@hide
+	SetCall(string call) {
+	
+		# only set if not null/default
+		me.call ?= call
+	}
+
+}
+
+@entry
+Main() {
+	cat = new Cat()
+	cat.foo("Test", s2: "bacon")
+}
