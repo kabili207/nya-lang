@@ -1,0 +1,57 @@
+# =========================
+# Visual Studio crap
+# =========================
+
+# User-specific files
+*.suo
+*.user
+*.sln.docstates
+.vs/
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+x64/
+build/
+bld/
+[Bb]in/
+[Oo]bj/
+[Dd]oc/
+
+# =========================
+# MonoDevelop files
+# =========================
+
+# User Specific
+*.userprefs
+*.usertasks
+
+# Mono Project Files
+*.pidb
+*.resources
+test-results/
+
+# =========================
+# NuGet stuff
+# =========================
+
+# NuGet Packages
+*.nupkg
+# The packages folder can be ignored because of Package Restore
+**/packages/*
+# except build/, which is used as an MSBuild target.
+!**/packages/build/
+# Uncomment if necessary however generally it will be regenerated when needed
+#!**/packages/repositories.config
+
+# =========================
+# Windows detritus
+# =========================
+
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
