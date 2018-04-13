@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using Antlr4.Runtime.Misc;
@@ -102,14 +103,11 @@ namespace NyaLang
                 }
             }
 
-            _currMethodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs);
-
             var parameters = context.fixed_parameters()?.children.OfType<NyaParser.Fixed_parameterContext>();
 
-            Type[] types = new[] { ParseTypeDescriptor(context.type_descriptor()) }
-                .Concat(parameters.Select(x => ParseTypeDescriptor(x.type_descriptor()))).ToArray();
-
-            _currMethodBuilder.SetParameters(types);
+            _currMethodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs,
+                ParseTypeDescriptor(context.type_descriptor()),
+                parameters.Select(x => ParseTypeDescriptor(x.type_descriptor())).ToArray());
 
             for (int i = 0; i < parameters.Count(); i++)
             {
@@ -117,10 +115,27 @@ namespace NyaLang
                 string paramName = param.Identifier().GetText();
 
                 ParameterAttributes pAttrs = ParameterAttributes.None;
-                if (param.Question() != null)
-                    pAttrs |= ParameterAttributes.Optional;
 
                 ParameterBuilder pb = _currMethodBuilder.DefineParameter(i + 1, pAttrs, paramName);
+
+                if (param.Question() != null)
+                {
+                    pb.SetCustomAttribute(
+                        new CustomAttributeBuilder(
+                            typeof(OptionalAttribute).GetConstructor(new Type[] { }),
+                            new object[] { })
+                    );
+
+                    // For default values
+                    //pb.SetCustomAttribute(
+                    //    new CustomAttributeBuilder(
+                    //        typeof(OptionalAttribute).GetConstructor(new Type[] { typeof(Object) }),
+                    //        new object[]{ "Bacon" } )
+                    //);
+
+                }
+
+
             }
 
             if (bIsEntry)

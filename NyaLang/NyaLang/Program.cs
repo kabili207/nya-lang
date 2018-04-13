@@ -7,6 +7,7 @@ using NyaLang.Antlr;
 using Antlr4.Runtime;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.InteropServices;
 
 namespace NyaLang
 {
@@ -23,6 +24,11 @@ namespace NyaLang
                         c = b;
                         return a + c;
                     }
+
+	                @override
+	                Foo(string message, string s1?, string s2?) {
+
+	                }
                 }
 ";
 
@@ -37,13 +43,7 @@ namespace NyaLang
             var context = nyaParser.@class();
 
             NyaVisitor visitor = new NyaVisitor("NyaTest", "NyaTest.exe");
-            TypeBuilder entry = visitor.CreateType("EntryPoint", TypeAttributes.Public | TypeAttributes.Class);
-
-            //MethodBuilder main = compiler.CreateMain(entry);
-
-            visitor.Visit(context, entry);
-
-            entry.CreateType();
+            visitor.Visit(context);
             visitor.Save();
 
             //Console.WriteLine(visitor.Visit(expressionContext));
@@ -52,6 +52,11 @@ namespace NyaLang
         public static void VoidReturn()
         {
             return;
+        }
+
+        private void Foo(string message, [Optional] string s1, string s2 = "Bacon")
+        {
+
         }
 
         public static double EmitTest()
