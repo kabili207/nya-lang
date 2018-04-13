@@ -15,10 +15,15 @@ namespace NyaLang
         static void Main(string[] args)
         {
             string input = @"
-                a = 12;
-                b = log(10 + a * 35 + (5.4 - 7.4));
-                c = b;
-                a + c;
+                class Cat {
+                    @public @entry
+	                int SetCall!(string[] args) {
+                        a = 12;
+                        b = log(10 + a * 35 + (5.4 - 7.4));
+                        c = b;
+                        return a + c;
+                    }
+                }
 ";
 
             //input = "log(10 + 1 * 35 + (5.4 - 7.4));";
@@ -29,20 +34,24 @@ namespace NyaLang
             CommonTokenStream commonTokenStream = new CommonTokenStream(nyaLexer);
             NyaParser nyaParser = new NyaParser(commonTokenStream);
 
-            NyaParser.Block_listContext blockContext = nyaParser.block_list();
+            var context = nyaParser.@class();
 
-            NyaCompiler compiler = new NyaCompiler("NyaTest", "NyaTest.exe");
-            TypeBuilder entry = compiler.CreateType("EntryPoint", TypeAttributes.Public | TypeAttributes.Class);
-            MethodBuilder main = compiler.CreateMain(entry);
+            NyaVisitor visitor = new NyaVisitor("NyaTest", "NyaTest.exe");
+            TypeBuilder entry = visitor.CreateType("EntryPoint", TypeAttributes.Public | TypeAttributes.Class);
 
-            NyaVisitor visitor = new NyaVisitor();
-            visitor.Visit(blockContext, main);
+            //MethodBuilder main = compiler.CreateMain(entry);
+
+            visitor.Visit(context, entry);
+
             entry.CreateType();
-
-            compiler.SetEntryPoint(main, PEFileKinds.ConsoleApplication);
-            compiler.Save();
+            visitor.Save();
 
             //Console.WriteLine(visitor.Visit(expressionContext));
+        }
+
+        public static void VoidReturn()
+        {
+            return;
         }
 
         public static double EmitTest()

@@ -1,17 +1,53 @@
 grammar Nya;
 
 
-block_list
-	: block*
+class
+	: attributes? 'class' Identifier CurlyLeft (class_content)* CurlyRight
+	;
+
+class_content
+	: method
+	;
+
+method
+	: attributes? type_descriptor? Identifier Exclamation? RoundLeft fixed_parameters? RoundRight CurlyLeft block CurlyRight
+	;
+
+attributes
+	: attribute+
+	;
+
+attribute
+	: At Identifier
+	;
+
+fixed_parameters
+	:  fixed_parameter (',' fixed_parameter)*
+	;
+
+fixed_parameter
+	: type_descriptor Identifier Question?
+	;
+
+type_descriptor
+	: attributes? Identifier array_type?
+	;
+
+array_type
+	: '[]'
 	;
 
 block
+	: expression_list*
+	;
+
+expression_list
 	: assignment SemiColon
 	| expression SemiColon
 	;
 
 assignment
-	: Name Equal expression
+	: type_descriptor? Identifier Equal expression
 	;
 
 
@@ -29,9 +65,10 @@ expression
     | expression Pipe expression                     #bitwiseOrExp
     | expression Ampersand Ampersand expression      #logicalAndExp
     | expression Pipe Pipe expression                #logicalOrExp
-    | Name RoundLeft expression RoundRight           #functionExp
+    | Identifier RoundLeft expression RoundRight     #functionExp
+	| 'return' expression                            #returnExp
     | Number                                         #numericAtomExp
-    | Name                                           #nameAtomExp
+    | Identifier                                     #nameAtomExp
     ;
 
 
@@ -103,7 +140,7 @@ QuotationDouble     : '"' ;
 QuotationSingle     : '\'' ;
 
 
-ID                  : Letter Digit ;
+Identifier          : (Letter|Underscore) (Letter|Underscore|Digit)* ;
 
 Name                : Letter+ ;
 
