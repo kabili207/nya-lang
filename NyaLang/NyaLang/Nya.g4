@@ -1,15 +1,39 @@
 grammar Nya;
 
-
-class
-	: attributes? 'class' Identifier CurlyLeft (class_content)* CurlyRight
+compilation_unit
+	: unit_declarations
 	;
 
-class_content
-	: method
+unit_declarations
+	: unit_declaration+
 	;
 
-method
+unit_declaration
+	: type_delcaration
+	| method_declaration
+	;
+
+type_delcaration
+	: attributes? (class_declaration)
+	;
+
+class_declaration
+	: 'class' Identifier class_body
+	;
+
+class_body
+	: CurlyLeft class_member_declarations? CurlyRight
+	;
+
+class_member_declarations
+	: class_member_declaration+
+	;
+
+class_member_declaration
+	: (method_declaration)
+	;
+
+method_declaration
 	: attributes? type_descriptor? Identifier Exclamation? RoundLeft fixed_parameters? RoundRight CurlyLeft block CurlyRight
 	;
 
@@ -42,17 +66,26 @@ block
 	;
 
 expression_list
-	: assignment SemiColon
-	| expression SemiColon
+	: assignment SemiColon           #assignmentExp
+	| expression SemiColon           #expressExp
+	| 'return' expression? SemiColon #returnExp
 	;
 
 assignment
-	: type_descriptor? Identifier Equal expression
+	: type_descriptor? Identifier assignment_operator expression
 	;
 
 
 assignment_operator
-	: '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<='
+	: '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<=' | '?='
+	;
+
+arguments
+	: argument (',' argument)*
+	;
+
+argument
+	: expression
 	;
 
 expression
@@ -65,12 +98,46 @@ expression
     | expression Pipe expression                     #bitwiseOrExp
     | expression Ampersand Ampersand expression      #logicalAndExp
     | expression Pipe Pipe expression                #logicalOrExp
-    | Identifier RoundLeft expression RoundRight     #functionExp
-	| 'return' expression                            #returnExp
+    | Identifier RoundLeft arguments? RoundRight     #functionExp
+	| REGULAR_STRING                                 #stringExp
     | Number                                         #numericAtomExp
     | Identifier                                     #nameAtomExp
     ;
 
+
+REGULAR_STRING:     '"'  (~["\\\r\n\u0085\u2028\u2029] | CommonCharacter)* '"';
+
+fragment CommonCharacter
+	: SimpleEscapeSequence
+	| HexEscapeSequence
+	| UnicodeEscapeSequence
+	;
+fragment SimpleEscapeSequence
+	: '\\\''
+	| '\\"'
+	| '\\\\'
+	| '\\0'
+	| '\\a'
+	| '\\b'
+	| '\\f'
+	| '\\n'
+	| '\\r'
+	| '\\t'
+	| '\\v'
+	;
+fragment HexEscapeSequence
+	: '\\x' HexDigit
+	| '\\x' HexDigit HexDigit
+	| '\\x' HexDigit HexDigit HexDigit
+	| '\\x' HexDigit HexDigit HexDigit HexDigit
+	;
+
+fragment UnicodeEscapeSequence
+	: '\\u' HexDigit HexDigit HexDigit HexDigit
+	| '\\U' HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit HexDigit
+	;
+
+fragment HexDigit : [0-9] | [A-F] | [a-f];
 
 fragment Letter     : [a-zA-Z] ;
 fragment Digit      : [0-9] ;

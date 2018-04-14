@@ -17,6 +17,7 @@ namespace NyaLang
         TypeBuilder _currTypeBuilder = null;
         MethodBuilder _currMethodBuilder = null;
         ILGenerator _ilg = null;
+        Label returnLabel;
 
         Dictionary<string, LocalBuilder> locals = new Dictionary<string, LocalBuilder>();
 
@@ -38,7 +39,7 @@ namespace NyaLang
             an.Name = assemblyName;
             _outPath = output;
             _appDomain = AppDomain.CurrentDomain;
-            _asmBuilder = _appDomain.DefineDynamicAssembly(an, AssemblyBuilderAccess.Save);
+            _asmBuilder = _appDomain.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave);
             _moduleBuilder = _asmBuilder.DefineDynamicModule(an.Name, output);
         }
 
@@ -63,7 +64,14 @@ namespace NyaLang
             Visit(tree);
         }
 
-        public override object VisitClass([NotNull] NyaParser.ClassContext context)
+        public override object VisitCompilation_unit([NotNull] NyaParser.Compilation_unitContext context)
+        {
+            object r = base.VisitCompilation_unit(context);
+            _moduleBuilder.CreateGlobalFunctions();
+            return r;
+        }
+
+        public override object VisitClass_declaration([NotNull] NyaParser.Class_declarationContext context)
         {
             string typeName = context.Identifier().GetText();
 
@@ -75,20 +83,33 @@ namespace NyaLang
 
             _currTypeBuilder.CreateType();
 
+            _currTypeBuilder = null;
+
             return null;
         }
 
-        public override object VisitMethod([NotNull] NyaParser.MethodContext context)
+        public override object VisitMethod_declaration([NotNull] NyaParser.Method_declarationContext context)
         {
             string methodName = context.Identifier().GetText();
             bool bIsEntry = false;
+            bool isStatic = context.Exclamation() != null;
+            bool isConstructor = methodName == "New";
 
-            MethodAttributes methAttrs = MethodAttributes.Private;
+            MethodAttributes methAttrs = MethodAttributes.Private | MethodAttributes.HideBySig;
 
-            if (context.Exclamation() != null)
+            if (isStatic)
+            {
                 methAttrs |= MethodAttributes.Static;
+            }
 
-            foreach (var attr in context.attributes()?.children.OfType<NyaParser.AttributeContext>())
+            if (isConstructor)
+            {
+                methodName = isStatic ? ".cctor" : ".ctor";
+                methAttrs |= MethodAttributes.SpecialName;
+            }
+
+            foreach (var attr in context.attributes()?.children?
+                .OfType<NyaParser.AttributeContext>() ?? new NyaParser.AttributeContext[] { })
             {
                 string attrName = attr.Identifier().GetText();
                 switch (attrName)
@@ -97,17 +118,30 @@ namespace NyaLang
                         bIsEntry = true;
                         break;
                     case "public":
-                        methAttrs ^= MethodAttributes.Private;
-                        methAttrs |= MethodAttributes.Public;
+                        if (isConstructor ^ isStatic)
+                        {
+                            methAttrs ^= MethodAttributes.Private;
+                            methAttrs |= MethodAttributes.Public;
+                        }
                         break;
                 }
             }
 
-            var parameters = context.fixed_parameters()?.children.OfType<NyaParser.Fixed_parameterContext>();
+            var parameters = context.fixed_parameters()?.children?
+                .OfType<NyaParser.Fixed_parameterContext>() ?? new NyaParser.Fixed_parameterContext[] { };
 
-            _currMethodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs,
-                ParseTypeDescriptor(context.type_descriptor()),
-                parameters.Select(x => ParseTypeDescriptor(x.type_descriptor())).ToArray());
+            Type[] paramTypes = parameters.Select(x => ParseTypeDescriptor(x.type_descriptor())).ToArray();
+            Type returnType = ParseTypeDescriptor(context.type_descriptor());
+
+
+            if (_currTypeBuilder != null)
+            {
+                _currMethodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs, returnType, paramTypes);
+            }
+            else
+            {
+                _currMethodBuilder = _moduleBuilder.DefineGlobalMethod(methodName, methAttrs, returnType, paramTypes);
+            }
 
             for (int i = 0; i < parameters.Count(); i++)
             {
@@ -143,7 +177,17 @@ namespace NyaLang
 
             _ilg = _currMethodBuilder.GetILGenerator();
 
+            returnLabel = _ilg.DefineLabel();
+
             var block = context.block();
+
+            if(isConstructor && !isStatic)
+            {
+                _ilg.Emit(OpCodes.Ldarg_0);
+                ConstructorInfo ci = typeof(object).GetConstructor(new Type[] { });
+                _ilg.Emit(OpCodes.Call, ci);
+            }
+
             if (block.ChildCount > 0)
             {
                 Visit(block);
@@ -152,8 +196,10 @@ namespace NyaLang
             {
                 // We need to do _something_
                 _ilg.Emit(OpCodes.Nop);
-                _ilg.Emit(OpCodes.Ret);
+                _ilg.Emit(OpCodes.Br_S, returnLabel);
             }
+            _ilg.MarkLabel(returnLabel);
+            _ilg.Emit(OpCodes.Ret);
 
             _ilg = null;
 
@@ -196,6 +242,15 @@ namespace NyaLang
             return null;
         }
 
+        public override object VisitStringExp([NotNull] NyaParser.StringExpContext context)
+        {
+            string rawString = context.GetText();
+            rawString = rawString.Substring(1, rawString.Length - 2);
+            string unescaped = StringHelper.StringFromCSharpLiteral(rawString);
+            _ilg.Emit(OpCodes.Ldstr, unescaped);
+            return typeof(string);
+        }
+
         public override object VisitNumericAtomExp([NotNull] NyaParser.NumericAtomExpContext context)
         {
             string numText = context.Number().Symbol.Text;
@@ -218,7 +273,7 @@ namespace NyaLang
         public override object VisitReturnExp([NotNull] NyaParser.ReturnExpContext context)
         {
             Visit(context.expression());
-            _ilg.Emit(OpCodes.Ret);
+            _ilg.Emit(OpCodes.Br_S, returnLabel);
             return null;
         }
 
@@ -284,15 +339,20 @@ namespace NyaLang
             switch (name)
             {
                 case "sqrt":
-                    Visit(context.expression());
+                    Visit(context.arguments());
                     var miSqrt = mathType.GetMethod("Sqrt");
                     _ilg.Emit(OpCodes.Call, miSqrt);
                     break;
 
                 case "log":
-                    Visit(context.expression());
+                    Visit(context.arguments());
                     var miLog = mathType.GetMethod("Log10");
                     _ilg.Emit(OpCodes.Call, miLog);
+                    break;
+                case "print":
+                    Visit(context.arguments());
+                    var miWrite = typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
+                    _ilg.Emit(OpCodes.Call, miWrite);
                     break;
             }
             return result;
