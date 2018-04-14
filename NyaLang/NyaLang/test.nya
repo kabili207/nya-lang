@@ -1,5 +1,26 @@
 ﻿
-class Cat {
+class Animal {
+
+	New() {
+
+	}
+
+	New!() {
+
+	}
+
+	@public @virtual
+	Foo() {
+
+	}
+
+	@public
+	Bar() {
+
+	}
+}
+
+class Cat << Animal {
 
 	New() {
 

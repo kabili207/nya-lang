@@ -7,25 +7,30 @@ using System.Threading.Tasks;
 
 namespace NyaLang
 {
-    class TestClass
+    interface IFace { }
+    class TestBase { }
+
+    class TestClass : TestBase, IFace
     {
-        public static void VoidReturn()
+        string classVar = "SKREEEE";
+
+        public void VoidReturn()
         {
             return;
         }
 
-        public static int? ParseInt(string s)
+        public int? ParseInt(string s)
         {
             int i;
             return int.TryParse(s, out i) ? (int?)i : null;
         }
 
-        public static char ByteToChar(byte i)
+        public char ByteToChar(byte i)
         {
             return (char)i;
         }
 
-        public static void MultiReturn(int i)
+        public void MultiReturn(int i)
         {
             i += 4;
 
@@ -39,13 +44,12 @@ namespace NyaLang
 
         private void Foo(string message, [Optional] string s1, string s2 = "Bacon")
         {
-
             s1 = s1 ?? "Flarp";
         }
 
-        public static double EmitTest()
+        public string ClassVar()
         {
-            return Math.Sqrt(10 + 1 * 35 + (5.4 - 7.4));
+            return classVar;
         }
 
     }

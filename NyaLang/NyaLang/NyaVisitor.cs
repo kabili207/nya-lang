@@ -77,8 +77,24 @@ namespace NyaLang
             string typeName = context.Identifier().GetText();
 
             TypeAttributes typeAttr = TypeAttributes.Class;
+            List<Type> interfaces = new List<Type>();
 
-            _currTypeBuilder = _moduleBuilder.DefineType(typeName, typeAttr);
+            if (context.types() != null)
+            {
+                foreach (NyaParser.TypeContext con in context.types().children)
+                {
+                    Type t = _moduleBuilder.GetType(con.GetText());
+                    interfaces.Add(t);
+                }
+            }
+
+            Type baseClass = interfaces.FirstOrDefault();
+            if(baseClass != null && !baseClass.IsInterface)
+            {
+                interfaces.RemoveAt(0);
+            }
+
+            _currTypeBuilder = _moduleBuilder.DefineType(typeName, typeAttr, baseClass, interfaces.ToArray());
 
             VisitChildren(context);
 
@@ -189,7 +205,7 @@ namespace NyaLang
                 _ilg.Emit(OpCodes.Call, ci);
             }
 
-            if (block.ChildCount > 0)
+            if (block != null && block.ChildCount > 0)
             {
                 Visit(block);
             }

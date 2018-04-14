@@ -18,7 +18,7 @@ type_delcaration
 	;
 
 class_declaration
-	: 'class' Identifier class_body
+	: 'class' Identifier ('<<' types)? class_body
 	;
 
 class_body
@@ -55,6 +55,10 @@ fixed_parameter
 
 type_descriptor
 	: attributes? type
+	;
+
+types
+	: type (',' type)*
 	;
 
 type
