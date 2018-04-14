@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 using System.IO;
+using static NyaLang.TestClass;
 
 namespace NyaLang
 {
@@ -22,7 +23,6 @@ namespace NyaLang
 
         static void Main(string[] args)
         {
-
             var assembly = Assembly.GetExecutingAssembly();
             var resourceName = "NyaLang.test.nya";
 
@@ -46,31 +46,6 @@ namespace NyaLang
             visitor.Save();
 
             //Console.WriteLine(visitor.Visit(expressionContext));
-        }
-
-        public static void VoidReturn()
-        {
-            return;
-        }
-
-        public static void MultiReturn(int i)
-        {
-            if(i % 12 == 0)
-            {
-                return;
-            }
-            Console.WriteLine("Vacon");
-            return;
-        }
-
-        private void Foo(string message, [Optional] string s1, string s2 = "Bacon")
-        {
-
-        }
-
-        public static double EmitTest()
-        {
-            return Math.Sqrt(10 + 1 * 35 + (5.4 - 7.4));
         }
     }
 }

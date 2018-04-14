@@ -29,8 +29,9 @@ namespace NyaLang
 
         private Dictionary<string, Type> typeAliases = new Dictionary<string, Type>()
         {
-            { "string", typeof(String) }, { "int", typeof(Int32) }, { "byte", typeof(Byte) },
-            { "bool", typeof(Boolean) }, { "float", typeof(Single) }
+            { "string", typeof(String) }, { "bool", typeof(Boolean) }, { "float", typeof(Single) }, { "double", typeof(Double) },
+            { "sbyte", typeof(SByte) }, { "short", typeof(Int16) }, { "int", typeof(Int32) }, { "long", typeof(Int64) },
+            { "byte", typeof(Byte) }, { "ushort", typeof(UInt16) }, { "uint", typeof(UInt32) }, { "ulong", typeof(UInt64) }
         };
 
         public NyaVisitor(string assemblyName, string output)
@@ -181,7 +182,7 @@ namespace NyaLang
 
             var block = context.block();
 
-            if(isConstructor && !isStatic)
+            if (isConstructor && !isStatic)
             {
                 _ilg.Emit(OpCodes.Ldarg_0);
                 ConstructorInfo ci = typeof(object).GetConstructor(new Type[] { });
@@ -206,10 +207,9 @@ namespace NyaLang
             return _currMethodBuilder;
         }
 
-        private Type ParseTypeDescriptor(NyaParser.Type_descriptorContext context)
+        private Type ParseType(NyaParser.TypeContext context)
         {
             Type t = typeof(void);
-
             if (context != null)
             {
                 string typeName = context.Identifier().GetText();
@@ -223,6 +223,15 @@ namespace NyaLang
                 }
             }
             return t;
+        }
+
+        private Type ParseTypeDescriptor(NyaParser.Type_descriptorContext context)
+        {
+            if (context != null)
+            {
+                return ParseType(context.type());
+            }
+            return typeof(void);
         }
 
         public override object VisitType_descriptor([NotNull] NyaParser.Type_descriptorContext context)
@@ -242,6 +251,12 @@ namespace NyaLang
             return null;
         }
 
+        public override object VisitParenthesisExp([NotNull] NyaParser.ParenthesisExpContext context)
+        {
+            // Required to pass type
+            return Visit(context.expression());
+        }
+
         public override object VisitStringExp([NotNull] NyaParser.StringExpContext context)
         {
             string rawString = context.GetText();
@@ -255,11 +270,15 @@ namespace NyaLang
         {
             string numText = context.Number().Symbol.Text;
             if (numText.Contains('.'))
+            {
                 _ilg.Emit(OpCodes.Ldc_R4, float.Parse(numText));
+                return typeof(float);
+            }
             else
+            {
                 _ilg.Emit(OpCodes.Ldc_I4, int.Parse(numText));
-
-            return null;
+                return typeof(int);
+            }
         }
 
         public override object VisitNameAtomExp([NotNull] NyaParser.NameAtomExpContext context)
@@ -267,23 +286,35 @@ namespace NyaLang
             string sLocal = context.Identifier().GetText();
             LocalBuilder local = locals[sLocal];
             _ilg.Emit(OpCodes.Ldloc, local);
-            return null;
+            return local.LocalType;
         }
 
         public override object VisitReturnExp([NotNull] NyaParser.ReturnExpContext context)
         {
             Visit(context.expression());
             _ilg.Emit(OpCodes.Br_S, returnLabel);
-            return null;
+            return _currMethodBuilder.ReturnType;
+        }
+
+        public override object VisitCastExp([NotNull] NyaParser.CastExpContext context)
+        {
+            Type src = (Type)Visit(context.expression());
+            Type dst = ParseType(context.type());
+
+            if (!CastHelper.TryConvert(_ilg, src, dst))
+                throw new Exception("Shit failed, yo");
+
+            return dst;
         }
 
         public override object VisitAssignment([NotNull] NyaParser.AssignmentContext context)
         {
-            // TODO: Types?
             string sLocal = context.Identifier().GetText();
-            LocalBuilder local;
+            string sOperator = context.assignment_operator().GetText();
 
-            Visit(context.expression());
+            LocalBuilder local = null;
+
+            Type src = (Type)Visit(context.expression());
 
             if (locals.ContainsKey(sLocal))
             {
@@ -291,20 +322,34 @@ namespace NyaLang
             }
             else
             {
-                local = _ilg.DeclareLocal(typeof(int));
+                Type dst = null;
+                if (context.type_descriptor() != null)
+                    dst = ParseTypeDescriptor(context.type_descriptor());
+                else
+                    dst = src;
+
+                local = _ilg.DeclareLocal(dst);
                 locals.Add(sLocal, local);
             }
 
+            if (!CastHelper.TryConvert(_ilg, src, local.LocalType))
+                throw new Exception("Shit failed, yo");
+
             _ilg.Emit(OpCodes.Stloc, local);
 
+            return local.LocalType;
+        }
 
-            return null;
         }
 
         public override object VisitMulDivExp([NotNull] NyaParser.MulDivExpContext context)
         {
-            Visit(context.expression(0));
-            Visit(context.expression(1));
+            // TODO: Cast this shit
+            Type tLeft = (Type)Visit(context.expression(0));
+            Type tRight = (Type)Visit(context.expression(1));
+
+            if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
+                throw new Exception("Shit failed, yo");
 
             if (context.Asterisk() != null)
                 _ilg.Emit(OpCodes.Mul);
@@ -312,13 +357,20 @@ namespace NyaLang
             if (context.Slash() != null)
                 _ilg.Emit(OpCodes.Div);
 
-            return null;
+            if (context.Percent() != null)
+                _ilg.Emit(OpCodes.Rem);
+
+            return tLeft;
         }
 
         public override object VisitAddSubExp([NotNull] NyaParser.AddSubExpContext context)
         {
-            Visit(context.expression(0));
-            Visit(context.expression(1));
+            // TODO: Cast this shit
+            Type tLeft = (Type)Visit(context.expression(0));
+            Type tRight = (Type)Visit(context.expression(1));
+
+            if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
+                throw new Exception("Shit failed, yo");
 
             if (context.Plus() != null)
                 _ilg.Emit(OpCodes.Add);
@@ -326,13 +378,15 @@ namespace NyaLang
             if (context.Minus() != null)
                 _ilg.Emit(OpCodes.Sub);
 
-            return null;
+            return tLeft;
         }
 
         public override object VisitFunctionExp([NotNull] NyaParser.FunctionExpContext context)
         {
+            // TODO: Account for parameters
+
             String name = context.Identifier().GetText();
-            int result = 0;
+            Type returnType = null;
 
             Type mathType = typeof(Math);
 
@@ -341,21 +395,24 @@ namespace NyaLang
                 case "sqrt":
                     Visit(context.arguments());
                     var miSqrt = mathType.GetMethod("Sqrt");
+                    returnType = miSqrt.ReturnType;
                     _ilg.Emit(OpCodes.Call, miSqrt);
                     break;
 
                 case "log":
                     Visit(context.arguments());
                     var miLog = mathType.GetMethod("Log10");
+                    returnType = miLog.ReturnType;
                     _ilg.Emit(OpCodes.Call, miLog);
                     break;
                 case "print":
                     Visit(context.arguments());
                     var miWrite = typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
+                    returnType = miWrite.ReturnType;
                     _ilg.Emit(OpCodes.Call, miWrite);
                     break;
             }
-            return result;
+            return returnType;
         }
     }
 }

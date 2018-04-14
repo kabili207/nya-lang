@@ -54,7 +54,11 @@ fixed_parameter
 	;
 
 type_descriptor
-	: attributes? Identifier array_type?
+	: attributes? type
+	;
+
+type
+	: Identifier array_type?
 	;
 
 array_type
@@ -77,7 +81,6 @@ assignment
 
 
 assignment_operator
-	: '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<=' | '?='
 	;
 
 arguments
@@ -99,6 +102,7 @@ expression
     | expression Ampersand Ampersand expression      #logicalAndExp
     | expression Pipe Pipe expression                #logicalOrExp
     | Identifier RoundLeft arguments? RoundRight     #functionExp
+	| RoundLeft type RoundRight expression           #castExp
 	| REGULAR_STRING                                 #stringExp
     | Number                                         #numericAtomExp
     | Identifier                                     #nameAtomExp
