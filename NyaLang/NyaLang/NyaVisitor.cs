@@ -313,14 +313,26 @@ namespace NyaLang
             string sOperator = context.assignment_operator().GetText();
 
             LocalBuilder local = null;
-
-            Type src = (Type)Visit(context.expression());
-
             if (locals.ContainsKey(sLocal))
             {
                 local = locals[sLocal];
             }
-            else
+            Label nullOp = _ilg.DefineLabel();
+
+            if (sOperator != "=")
+            {
+                _ilg.Emit(OpCodes.Ldloc, local);
+                if (sOperator == "?=")
+                {
+                    _ilg.Emit(OpCodes.Dup);
+                    _ilg.Emit(OpCodes.Brtrue_S, nullOp);
+                    _ilg.Emit(OpCodes.Pop);
+                }
+            }
+
+            Type src = (Type)Visit(context.expression());
+
+            if (local == null)
             {
                 Type dst = null;
                 if (context.type_descriptor() != null)
@@ -335,11 +347,44 @@ namespace NyaLang
             if (!CastHelper.TryConvert(_ilg, src, local.LocalType))
                 throw new Exception("Shit failed, yo");
 
+            switch (sOperator)
+            {
+                case "+=": _ilg.Emit(OpCodes.Add); break;
+                case "-=": _ilg.Emit(OpCodes.Sub); break;
+                case "*=": _ilg.Emit(OpCodes.Mul); break;
+                case "/=": _ilg.Emit(OpCodes.Div); break;
+                case "%=": _ilg.Emit(OpCodes.Rem); break;
+                case "&=": _ilg.Emit(OpCodes.And); break;
+                case "|=": _ilg.Emit(OpCodes.Or); break;
+                case "^=": _ilg.Emit(OpCodes.Xor); break;
+                case "<<=": _ilg.Emit(OpCodes.Shl); break;
+                case ">>=": _ilg.Emit(OpCodes.Shr); break;
+                case "?=": _ilg.MarkLabel(nullOp); break;
+            }
+
             _ilg.Emit(OpCodes.Stloc, local);
 
             return local.LocalType;
         }
 
+        public override object VisitCoalesceExp([NotNull] NyaParser.CoalesceExpContext context)
+        {
+            Label jmp = _ilg.DefineLabel();
+
+            Type tLeft = (Type)Visit(context.expression(0));
+
+            _ilg.Emit(OpCodes.Dup);
+            _ilg.Emit(OpCodes.Brtrue_S, jmp);
+            _ilg.Emit(OpCodes.Pop);
+
+            Type tRight = (Type)Visit(context.expression(1));
+
+            if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
+                throw new Exception("Shit failed, yo");
+
+            _ilg.MarkLabel(jmp);
+
+            return tLeft;
         }
 
         public override object VisitMulDivExp([NotNull] NyaParser.MulDivExpContext context)

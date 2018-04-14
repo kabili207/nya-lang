@@ -81,6 +81,7 @@ assignment
 
 
 assignment_operator
+	: '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^=' | '<<=' | '>>=' | '?='
 	;
 
 arguments
@@ -101,6 +102,7 @@ expression
     | expression Pipe expression                     #bitwiseOrExp
     | expression Ampersand Ampersand expression      #logicalAndExp
     | expression Pipe Pipe expression                #logicalOrExp
+	| expression '??' expression                     #coalesceExp
     | Identifier RoundLeft arguments? RoundRight     #functionExp
 	| RoundLeft type RoundRight expression           #castExp
 	| REGULAR_STRING                                 #stringExp
