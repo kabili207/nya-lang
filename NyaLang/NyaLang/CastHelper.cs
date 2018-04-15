@@ -83,6 +83,10 @@ namespace NyaLang
 
         public static bool TryConvert(ILGenerator ilg, Type src, Type dst)
         {
+            // Account for null values?
+            if (src == null || dst == null)
+                return true;
+
             if (src == dst)
             {
                 // NOP?

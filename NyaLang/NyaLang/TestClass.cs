@@ -14,6 +14,11 @@ namespace NyaLang
     {
         string classVar = "SKREEEE";
 
+        public TestClass()
+        {
+            object w = null;
+        }
+
         public void VoidReturn()
         {
             return;

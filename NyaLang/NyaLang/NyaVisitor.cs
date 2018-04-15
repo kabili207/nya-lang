@@ -14,10 +14,13 @@ namespace NyaLang
 {
     public class NyaVisitor : NyaBaseVisitor<object>
     {
+        const string NullKeyword = "nil";
+
         TypeBuilder _currTypeBuilder = null;
         MethodBuilder _currMethodBuilder = null;
         ILGenerator _ilg = null;
         Label returnLabel;
+
 
         ScopeManager _scopeManager = new ScopeManager();
 
@@ -285,6 +288,12 @@ namespace NyaLang
             return Visit(context.expression());
         }
 
+        public override object VisitNullExp([NotNull] NyaParser.NullExpContext context)
+        {
+            _ilg.Emit(OpCodes.Ldnull);
+            return null;
+        }
+
         public override object VisitStringExp([NotNull] NyaParser.StringExpContext context)
         {
             string rawString = context.GetText();
@@ -330,7 +339,7 @@ namespace NyaLang
             Type dst = ParseType(context.type());
 
             if (!CastHelper.TryConvert(_ilg, src, dst))
-                throw new Exception("Shit failed, yo");
+                throw new Exception("Shit's whacked, yo");
 
             return dst;
         }
@@ -365,12 +374,16 @@ namespace NyaLang
                 else
                     dst = src;
 
+                // Someone did an untyped null assignment...
+                if (dst == null)
+                    dst = typeof(object);
+
                 local = _ilg.DeclareLocal(dst);
                 _scopeManager.AddVariable(sLocal, local);
             }
 
             if (!CastHelper.TryConvert(_ilg, src, local.Type))
-                throw new Exception("Shit failed, yo");
+                throw new Exception("Shit's whacked, yo");
 
             switch (sOperator)
             {
@@ -405,21 +418,20 @@ namespace NyaLang
             Type tRight = (Type)Visit(context.expression(1));
 
             if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
-                throw new Exception("Shit failed, yo");
+                throw new Exception("Shit's whacked, yo");
 
             _ilg.MarkLabel(jmp);
 
-            return tLeft;
+            return tLeft ?? tRight;
         }
 
         public override object VisitMulDivExp([NotNull] NyaParser.MulDivExpContext context)
         {
-            // TODO: Cast this shit
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
             if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
-                throw new Exception("Shit failed, yo");
+                throw new Exception("Shit's whacked, yo");
 
             if (context.Asterisk() != null)
                 _ilg.Emit(OpCodes.Mul);
@@ -435,12 +447,11 @@ namespace NyaLang
 
         public override object VisitAddSubExp([NotNull] NyaParser.AddSubExpContext context)
         {
-            // TODO: Cast this shit
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
             if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
-                throw new Exception("Shit failed, yo");
+                throw new Exception("Shit's whacked, yo");
 
             if (context.Plus() != null)
                 _ilg.Emit(OpCodes.Add);
@@ -453,7 +464,7 @@ namespace NyaLang
 
         public override object VisitFunctionExp([NotNull] NyaParser.FunctionExpContext context)
         {
-            // TODO: Account for parameters
+            // TODO: Account for different parameters
 
             String name = context.Identifier().GetText();
             Type returnType = null;

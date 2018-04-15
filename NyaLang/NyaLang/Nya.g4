@@ -110,6 +110,7 @@ expression
     | Identifier RoundLeft arguments? RoundRight     #functionExp
 	| RoundLeft type RoundRight expression           #castExp
 	| REGULAR_STRING                                 #stringExp
+	| Null                                           #nullExp
     | Number                                         #numericAtomExp
     | Identifier                                     #nameAtomExp
     ;
@@ -186,6 +187,8 @@ fragment UnicodeClassZS
 	| '\u205F'
 	;
 
+
+Null                : 'nil' ;
 
 Equal               : '=' ;
 Asterisk            : '*' ;
