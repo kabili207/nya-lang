@@ -19,7 +19,7 @@ namespace NyaLang
         ILGenerator _ilg = null;
         Label returnLabel;
 
-        Dictionary<string, LocalBuilder> locals = new Dictionary<string, LocalBuilder>();
+        ScopeManager _scopeManager = new ScopeManager();
 
         private AppDomain _appDomain;
         public AssemblyBuilder _asmBuilder;
@@ -67,14 +67,18 @@ namespace NyaLang
 
         public override object VisitCompilation_unit([NotNull] NyaParser.Compilation_unitContext context)
         {
+            _scopeManager.Push(ScopeLevel.Global);
             object r = base.VisitCompilation_unit(context);
             _moduleBuilder.CreateGlobalFunctions();
+            _scopeManager.Pop();
             return r;
         }
 
         public override object VisitClass_declaration([NotNull] NyaParser.Class_declarationContext context)
         {
             string typeName = context.Identifier().GetText();
+
+            _scopeManager.Push(ScopeLevel.Class);
 
             TypeAttributes typeAttr = TypeAttributes.Class;
             List<Type> interfaces = new List<Type>();
@@ -102,6 +106,8 @@ namespace NyaLang
 
             _currTypeBuilder = null;
 
+            _scopeManager.Pop();
+
             return null;
         }
 
@@ -111,6 +117,8 @@ namespace NyaLang
             bool bIsEntry = false;
             bool isStatic = context.Exclamation() != null;
             bool isConstructor = methodName == "New";
+
+            _scopeManager.Push(ScopeLevel.Method);
 
             MethodAttributes methAttrs = MethodAttributes.Private | MethodAttributes.HideBySig;
 
@@ -168,6 +176,7 @@ namespace NyaLang
                 ParameterAttributes pAttrs = ParameterAttributes.None;
 
                 ParameterBuilder pb = _currMethodBuilder.DefineParameter(i + 1, pAttrs, paramName);
+                _scopeManager.AddVariable(paramName, pb, paramTypes[i]);
 
                 if (param.Question() != null)
                 {
@@ -176,6 +185,7 @@ namespace NyaLang
                             typeof(OptionalAttribute).GetConstructor(new Type[] { }),
                             new object[] { })
                     );
+
 
                     // For default values
                     //pb.SetCustomAttribute(
@@ -219,6 +229,8 @@ namespace NyaLang
             _ilg.Emit(OpCodes.Ret);
 
             _ilg = null;
+
+            _scopeManager.Pop();
 
             return _currMethodBuilder;
         }
@@ -300,9 +312,9 @@ namespace NyaLang
         public override object VisitNameAtomExp([NotNull] NyaParser.NameAtomExpContext context)
         {
             string sLocal = context.Identifier().GetText();
-            LocalBuilder local = locals[sLocal];
-            _ilg.Emit(OpCodes.Ldloc, local);
-            return local.LocalType;
+            Variable v = _scopeManager.FindVariable(sLocal);
+            v.Load(_ilg);
+            return v.Type;
         }
 
         public override object VisitReturnExp([NotNull] NyaParser.ReturnExpContext context)
@@ -328,16 +340,13 @@ namespace NyaLang
             string sLocal = context.Identifier().GetText();
             string sOperator = context.assignment_operator().GetText();
 
-            LocalBuilder local = null;
-            if (locals.ContainsKey(sLocal))
-            {
-                local = locals[sLocal];
-            }
+            Variable local = _scopeManager.FindVariable(sLocal);
+
             Label nullOp = _ilg.DefineLabel();
 
             if (sOperator != "=")
             {
-                _ilg.Emit(OpCodes.Ldloc, local);
+                local.Load(_ilg);
                 if (sOperator == "?=")
                 {
                     _ilg.Emit(OpCodes.Dup);
@@ -357,10 +366,10 @@ namespace NyaLang
                     dst = src;
 
                 local = _ilg.DeclareLocal(dst);
-                locals.Add(sLocal, local);
+                _scopeManager.AddVariable(sLocal, local);
             }
 
-            if (!CastHelper.TryConvert(_ilg, src, local.LocalType))
+            if (!CastHelper.TryConvert(_ilg, src, local.Type))
                 throw new Exception("Shit failed, yo");
 
             switch (sOperator)
@@ -378,9 +387,9 @@ namespace NyaLang
                 case "?=": _ilg.MarkLabel(nullOp); break;
             }
 
-            _ilg.Emit(OpCodes.Stloc, local);
+            local.Store(_ilg);
 
-            return local.LocalType;
+            return local.Type;
         }
 
         public override object VisitCoalesceExp([NotNull] NyaParser.CoalesceExpContext context)

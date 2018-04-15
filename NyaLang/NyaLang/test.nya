@@ -27,7 +27,7 @@ class Cat << Animal {
 	}
 
 	@public New!() {
-		w = 12 ?? 4
+		a = 12 ?? 4
 	}
 
     @public
@@ -41,11 +41,10 @@ class Cat << Animal {
 
 	@override
 	Foo(string message, string s1?, string s2?) {
-		q = "bacon"
-		q ?= "waffle"
+		s1 ?= "waffle"
 		s = 0
 		s ?= 12
-		t = q ?? "herp"
+		t = s2 ?? "herp"
 	}
 }
 
