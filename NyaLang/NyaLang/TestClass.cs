@@ -8,12 +8,15 @@ using System.Threading.Tasks;
 namespace NyaLang
 {
     interface IFace { }
-    class TestBase { }
+    class TestBase {
+        public TestBase()
+        {
+
+        }
+    }
 
     class TestClass : TestBase, IFace
     {
-        string classVar = "SKREEEE";
-
         public TestClass()
         {
             object w = null;
@@ -32,19 +35,13 @@ namespace NyaLang
 
         public char ByteToChar(byte i)
         {
+            long l = 12L;
             return (char)i;
         }
 
-        public void MultiReturn(int i)
+        public long ReturnLong(int i)
         {
-            i += 4;
-
-            if (i % 12 == 0)
-            {
-                return;
-            }
-            Console.WriteLine("Vacon");
-            return;
+            return long.MaxValue;
         }
 
         private void Foo(string message, [Optional] string s1, string s2 = "Bacon")
@@ -52,9 +49,16 @@ namespace NyaLang
             s1 = s1 ?? "Flarp";
         }
 
-        public string ClassVar()
+        public sbyte ReturnByte()
         {
-            return classVar;
+            return (sbyte)-1;
+        }
+
+        public ulong ReturnUlong()
+        {
+            decimal a = 1e-3m;
+
+            return 12385935794567457587UL;
         }
 
     }

@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
@@ -79,7 +80,7 @@ namespace NyaLang
 
         public override object VisitClass_declaration([NotNull] NyaParser.Class_declarationContext context)
         {
-            string typeName = context.Identifier().GetText();
+            string typeName = context.identifier().GetText();
 
             _scopeManager.Push(ScopeLevel.Class);
 
@@ -96,7 +97,7 @@ namespace NyaLang
             }
 
             Type baseClass = interfaces.FirstOrDefault();
-            if(baseClass != null && !baseClass.IsInterface)
+            if (baseClass != null && !baseClass.IsInterface)
             {
                 interfaces.RemoveAt(0);
             }
@@ -116,7 +117,7 @@ namespace NyaLang
 
         public override object VisitMethod_declaration([NotNull] NyaParser.Method_declarationContext context)
         {
-            string methodName = context.Identifier().GetText();
+            string methodName = context.identifier().GetText();
             bool bIsEntry = false;
             bool isStatic = context.Exclamation() != null;
             bool isConstructor = methodName == "New";
@@ -139,7 +140,7 @@ namespace NyaLang
             foreach (var attr in context.attributes()?.children?
                 .OfType<NyaParser.AttributeContext>() ?? new NyaParser.AttributeContext[] { })
             {
-                string attrName = attr.Identifier().GetText();
+                string attrName = attr.identifier().GetText();
                 switch (attrName)
                 {
                     case "entry":
@@ -174,7 +175,7 @@ namespace NyaLang
             for (int i = 0; i < parameters.Count(); i++)
             {
                 var param = parameters.ElementAt(i);
-                string paramName = param.Identifier().GetText();
+                string paramName = param.identifier().GetText();
 
                 ParameterAttributes pAttrs = ParameterAttributes.None;
 
@@ -214,8 +215,15 @@ namespace NyaLang
             if (isConstructor && !isStatic)
             {
                 _ilg.Emit(OpCodes.Ldarg_0);
-                ConstructorInfo ci = typeof(object).GetConstructor(new Type[] { });
+                ConstructorInfo ci = _currTypeBuilder.BaseType.GetConstructor(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    new Type[] { },
+                    null
+                    );
+
                 _ilg.Emit(OpCodes.Call, ci);
+                _ilg.Emit(OpCodes.Nop);
             }
 
             if (block != null && block.ChildCount > 0)
@@ -243,7 +251,7 @@ namespace NyaLang
             Type t = typeof(void);
             if (context != null)
             {
-                string typeName = context.Identifier().GetText();
+                string typeName = context.identifier().GetText();
                 if (typeAliases.ContainsKey(typeName))
                 {
                     t = typeAliases[typeName];
@@ -270,31 +278,35 @@ namespace NyaLang
             return ParseTypeDescriptor(context);
         }
 
-        public override object VisitBlock([NotNull] NyaParser.BlockContext context)
-        {
-            VisitChildren(context);
-            return null;
-        }
-
-        public override object VisitExpression_list([NotNull] NyaParser.Expression_listContext context)
-        {
-            VisitChildren(context);
-            return null;
-        }
-
         public override object VisitParenthesisExp([NotNull] NyaParser.ParenthesisExpContext context)
         {
             // Required to pass type
             return Visit(context.expression());
         }
 
-        public override object VisitNullExp([NotNull] NyaParser.NullExpContext context)
+        public override object VisitNullLiteral([NotNull] NyaParser.NullLiteralContext context)
         {
             _ilg.Emit(OpCodes.Ldnull);
             return null;
         }
 
-        public override object VisitStringExp([NotNull] NyaParser.StringExpContext context)
+        public override object VisitBoolLiteral([NotNull] NyaParser.BoolLiteralContext context)
+        {
+            string boolText = context.GetText();
+
+            if (boolText == "true")
+            {
+                _ilg.Emit(OpCodes.Ldc_I4_1);
+            }
+            else
+            {
+                _ilg.Emit(OpCodes.Ldc_I4_0);
+            }
+
+            return typeof(bool);
+        }
+
+        public override object VisitStringLiteral([NotNull] NyaParser.StringLiteralContext context)
         {
             string rawString = context.GetText();
             rawString = rawString.Substring(1, rawString.Length - 2);
@@ -303,30 +315,125 @@ namespace NyaLang
             return typeof(string);
         }
 
-        public override object VisitNumericAtomExp([NotNull] NyaParser.NumericAtomExpContext context)
+        public override object VisitRealLiteral([NotNull] NyaParser.RealLiteralContext context)
         {
-            string numText = context.Number().Symbol.Text;
-            if (numText.Contains('.'))
+            string value = context.GetText().ToLower();
+            string suffix = "";
+            if (new[] { 'f', 'd', 'm' }.Contains(value[value.Length - 1]))
             {
-                _ilg.Emit(OpCodes.Ldc_R4, float.Parse(numText));
-                return typeof(float);
+                suffix = value[value.Length - 1].ToString();
+                value = value.Substring(0, value.Length - 1);
             }
-            else
+
+            Type ret;
+
+            switch (suffix)
             {
-                _ilg.Emit(OpCodes.Ldc_I4, int.Parse(numText));
-                return typeof(int);
+                case "m":
+                    ret = typeof(decimal);
+
+                    var dec = decimal.Parse(value, value.Contains("e") ?
+                        System.Globalization.NumberStyles.Float : System.Globalization.NumberStyles.Number);
+
+                    ConstructorInfo ctor1 = typeof(Decimal).GetConstructor(
+                        new Type[] {
+                            typeof(Int32),
+                            typeof(Int32),
+                            typeof(Int32),
+                            typeof(Boolean),
+                            typeof(Byte)
+                        }
+                    );
+
+                    int[] parts = Decimal.GetBits(dec);
+                    bool sign = (parts[3] & 0x80000000) != 0;
+
+                    byte scale = (byte)((parts[3] >> 16) & 0x7F);
+
+                    _ilg.Emit(OpCodes.Nop);
+                    _ilg.Emit(OpCodes.Ldloc, _ilg.DeclareLocal(typeof(Decimal)));
+                    _ilg.Emit(OpCodes.Ldc_I4, parts[0]);
+                    _ilg.Emit(OpCodes.Ldc_I4, parts[1]);
+                    _ilg.Emit(OpCodes.Ldc_I4, parts[2]);
+                    _ilg.Emit(OpCodes.Ldc_I4, sign ? 1 : 0);
+                    _ilg.Emit(OpCodes.Ldc_I4, scale);
+                    _ilg.Emit(OpCodes.Call, ctor1);
+
+                    break;
+                case "d":
+                    ret = typeof(double);
+                    _ilg.Emit(OpCodes.Ldc_R8, double.Parse(value));
+                    break;
+                case "f":
+                default:
+                    ret = typeof(float);
+                    _ilg.Emit(OpCodes.Ldc_R4, float.Parse(value));
+                    break;
             }
+
+            return ret;
+        }
+
+        public override object VisitIntegerLiteral([NotNull] NyaParser.IntegerLiteralContext context)
+        {
+            string text = context.GetText();
+            var regex = Regex.Match(text, @"(\d+)(\w+)?");
+            string value = regex.Groups[1].Value;
+            string suffix = regex.Groups[2].Value.ToLower();
+
+            Type ret = null;
+
+            switch (suffix)
+            {
+                case "b":
+                    ret = typeof(byte);
+                    _ilg.Emit(OpCodes.Ldc_I4, byte.Parse(value));
+                    break;
+                case "s":
+                    ret = typeof(short);
+                    _ilg.Emit(OpCodes.Ldc_I4, short.Parse(value));
+                    break;
+                case "l":
+                    ret = typeof(long);
+                    _ilg.Emit(OpCodes.Ldc_I8, long.Parse(value));
+                    break;
+                case "u":
+                    ret = typeof(uint);
+                    _ilg.Emit(OpCodes.Ldc_I4, uint.Parse(value));
+                    break;
+                case "lu":
+                case "ul":
+                    ret = typeof(ulong);
+                    _ilg.Emit(OpCodes.Ldc_I8, (long)ulong.Parse(value));
+                    break;
+                case "su":
+                case "us":
+                    ret = typeof(ushort);
+                    _ilg.Emit(OpCodes.Ldc_I4, ushort.Parse(value));
+                    break;
+                case "sb":
+                case "bs":
+                    ret = typeof(sbyte);
+                    _ilg.Emit(OpCodes.Ldc_I4, sbyte.Parse(value));
+                    break;
+                default:
+                    ret = typeof(int);
+                    _ilg.Emit(OpCodes.Ldc_I4, int.Parse(value));
+                    break;
+            }
+
+            return ret;
         }
 
         public override object VisitNameAtomExp([NotNull] NyaParser.NameAtomExpContext context)
         {
-            string sLocal = context.Identifier().GetText();
+            string sLocal = context.identifier().GetText();
             Variable v = _scopeManager.FindVariable(sLocal);
             v.Load(_ilg);
             return v.Type;
         }
 
-        public override object VisitReturnExp([NotNull] NyaParser.ReturnExpContext context)
+        public override object VisitReturnStatement([NotNull] NyaParser.ReturnStatementContext context)
         {
             Visit(context.expression());
             _ilg.Emit(OpCodes.Br_S, returnLabel);
@@ -346,7 +453,7 @@ namespace NyaLang
 
         public override object VisitAssignment([NotNull] NyaParser.AssignmentContext context)
         {
-            string sLocal = context.Identifier().GetText();
+            string sLocal = context.identifier().GetText();
             string sOperator = context.assignment_operator().GetText();
 
             Variable local = _scopeManager.FindVariable(sLocal);
@@ -466,7 +573,7 @@ namespace NyaLang
         {
             // TODO: Account for different parameters
 
-            String name = context.Identifier().GetText();
+            String name = context.identifier().GetText();
             Type returnType = null;
 
             Type mathType = typeof(Math);

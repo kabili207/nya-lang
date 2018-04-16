@@ -23,29 +23,29 @@ class Animal {
 class Cat << Animal {
 
 	New() {
-		w = nil
+		w = nil;
 	}
 
 	@public
 	New!() {
-		a = 12 ?? 4
+		a = 12 ?? 4;
 	}
 
     @public
 	int SetCall!(string[] args) {
         a = 12;
         b = log(10 + a * 35 + (5.4 - 7.4));
-        c = b;
+        c = 13e-3m;
         return a + c;
     }
 
 
 	@override
 	Foo(string message, string s1?, string s2?) {
-		s1 ?= "waffle"
-		s = 0
-		s ?= 12
-		t = "blarp" ?? "herp"
+		s1 ?= "waffle";
+		s = 0;
+		s ?= 12;
+		t = nil ?? "herp";
 	}
 }
 

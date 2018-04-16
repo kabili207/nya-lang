@@ -61,7 +61,6 @@
     <Antlr4 Include="Nya.g4">
       <Generator>MSBuild:Compile</Generator>
       <CustomToolNamespace>NyaLang.Antlr</CustomToolNamespace>
-      <Listener>True</Listener>
       <Visitor>True</Visitor>
     </Antlr4>
     <None Include="packages.config" />
