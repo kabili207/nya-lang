@@ -36,12 +36,12 @@ class Cat << Animal {
         a = 12;
         b = log(10 + a * 35 + (5.4 - 7.4));
         c = 13e-3m;
-        return a + c;
+        return (decimal)a + c;
     }
 
 
 	@override
-	Foo(string message, string s1?, string s2?) {
+	Foo(string message, string s1 = "bacon", string s2?) {
 		s1 ?= "waffle";
 		s = 0;
 		s ?= 12;

@@ -51,7 +51,7 @@ fixed_parameters
 	;
 
 fixed_parameter
-	: type_descriptor identifier Question?
+	: type_descriptor identifier (Question | Equal literal)?
 	;
 
 type_descriptor
@@ -64,6 +64,11 @@ types
 
 type
 	: identifier array_type?
+	;
+
+
+type_argument_list
+	: '<' type ( ',' type)* '>'
 	;
 
 array_type

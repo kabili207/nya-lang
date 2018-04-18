@@ -22,7 +22,7 @@ namespace NyaLang
             object w = null;
         }
 
-        public void VoidReturn()
+        public void VoidReturn(string s = "bacon")
         {
             return;
         }
