@@ -13,7 +13,7 @@ using NyaLang.Antlr;
 
 namespace NyaLang
 {
-    public class NyaVisitor : NyaBaseVisitor<object>
+    public class Stage2Visitor : NyaBaseVisitor<object>
     {
         const string NullKeyword = "nil";
 
@@ -39,7 +39,7 @@ namespace NyaLang
             { "decimal", typeof(decimal) }, { "object", typeof(object) }
         };
 
-        public NyaVisitor(string assemblyName, string output)
+        public Stage2Visitor(string assemblyName, string output)
         {
             AssemblyName an = new AssemblyName();
             an.Name = assemblyName;
@@ -226,7 +226,7 @@ namespace NyaLang
                     null
                     );
 
-                _ilg.Emit(OpCodes.Call, ci);
+                _ilg.Emit(OpCodes.Callvirt, ci);
                 _ilg.Emit(OpCodes.Nop);
             }
 
@@ -391,13 +391,12 @@ namespace NyaLang
             byte scale = (byte)((parts[3] >> 16) & 0x7F);
 
             _ilg.Emit(OpCodes.Nop);
-            _ilg.Emit(OpCodes.Ldloc, _ilg.DeclareLocal(typeof(Decimal)));
             _ilg.Emit(OpCodes.Ldc_I4, parts[0]);
             _ilg.Emit(OpCodes.Ldc_I4, parts[1]);
             _ilg.Emit(OpCodes.Ldc_I4, parts[2]);
             _ilg.Emit(OpCodes.Ldc_I4, sign ? 1 : 0);
-            _ilg.Emit(OpCodes.Ldc_I4, scale);
-            _ilg.Emit(OpCodes.Call, ctor1);
+            _ilg.Emit(OpCodes.Ldc_I4, (int)scale);
+            _ilg.Emit(OpCodes.Newobj, ctor1);
         }
 
         public override object VisitRealLiteral([NotNull] NyaParser.RealLiteralContext context)
@@ -522,10 +521,14 @@ namespace NyaLang
             }
 
             Type src = (Type)Visit(context.expression());
+            Type dst = null;
 
-            if (local == null)
+            if (local != null)
             {
-                Type dst = null;
+                dst = local.Type;
+            }
+            else
+            {
                 if (context.type_descriptor() != null)
                     dst = ParseTypeDescriptor(context.type_descriptor());
                 else
@@ -539,21 +542,21 @@ namespace NyaLang
                 _scopeManager.AddVariable(sLocal, local);
             }
 
-            if (!CastHelper.TryConvert(_ilg, src, local.Type))
+            if (sOperator == "?=" && !OpHelper.TryConvert(_ilg, src, local.Type))
                 throw new Exception("Shit's whacked, yo");
 
             switch (sOperator)
             {
-                case "+=": _ilg.Emit(OpCodes.Add); break;
-                case "-=": _ilg.Emit(OpCodes.Sub); break;
-                case "*=": _ilg.Emit(OpCodes.Mul); break;
-                case "/=": _ilg.Emit(OpCodes.Div); break;
-                case "%=": _ilg.Emit(OpCodes.Rem); break;
-                case "&=": _ilg.Emit(OpCodes.And); break;
-                case "|=": _ilg.Emit(OpCodes.Or); break;
-                case "^=": _ilg.Emit(OpCodes.Xor); break;
-                case "<<=": _ilg.Emit(OpCodes.Shl); break;
-                case ">>=": _ilg.Emit(OpCodes.Shr); break;
+                case "+=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Add, "op_Addition"); break;
+                case "-=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Sub, "op_Subtraction"); break;
+                case "*=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Mul, "op_Multiply"); break;
+                case "/=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Div, "op_Division"); break;
+                case "%=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Rem, "op_Modulus"); break;
+                case "&=": OpHelper.DoMath(_ilg, dst, src, OpCodes.And, "op_BitwiseAnd"); break;
+                case "|=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Or, "op_BitwiseOr"); break;
+                case "^=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Xor, "op_ExclusiveOr"); break;
+                case "<<=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Shl, "op_LeftShift"); break;
+                case ">>=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Shr, "op_RightShift"); break;
                 case "?=": _ilg.MarkLabel(nullOp); break;
             }
 
@@ -581,7 +584,7 @@ namespace NyaLang
             Type src = (Type)Visit(context.expression());
             Type dst = ParseType(context.type());
 
-            if (!CastHelper.TryConvert(_ilg, src, dst))
+            if (!OpHelper.TryConvert(_ilg, src, dst))
                 throw new Exception("Shit's whacked, yo");
 
             return dst;
@@ -599,7 +602,7 @@ namespace NyaLang
 
             Type tRight = (Type)Visit(context.expression(1));
 
-            if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
+            if (!OpHelper.TryConvert(_ilg, tRight, tLeft))
                 throw new Exception("Shit's whacked, yo");
 
             _ilg.MarkLabel(jmp);
@@ -612,17 +615,14 @@ namespace NyaLang
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
-            if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
-                throw new Exception("Shit's whacked, yo");
-
             if (context.Asterisk() != null)
-                _ilg.Emit(OpCodes.Mul);
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Mul, "op_Multiply");
 
             if (context.Slash() != null)
-                _ilg.Emit(OpCodes.Div);
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Div, "op_Division");
 
             if (context.Percent() != null)
-                _ilg.Emit(OpCodes.Rem);
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Rem, "op_Modulus");
 
             return tLeft;
         }
@@ -632,14 +632,12 @@ namespace NyaLang
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
-            if (!CastHelper.TryConvert(_ilg, tRight, tLeft))
-                throw new Exception("Shit's whacked, yo");
 
             if (context.Plus() != null)
-                _ilg.Emit(OpCodes.Add);
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Add, "op_Addition");
 
             if (context.Minus() != null)
-                _ilg.Emit(OpCodes.Sub);
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Sub, "op_Subtraction");
 
             return tLeft;
         }
@@ -659,20 +657,20 @@ namespace NyaLang
                     Visit(context.arguments());
                     var miSqrt = mathType.GetMethod("Sqrt");
                     returnType = miSqrt.ReturnType;
-                    _ilg.Emit(OpCodes.Call, miSqrt);
+                    _ilg.EmitCall(OpCodes.Callvirt, miSqrt, new Type[] { });
                     break;
 
                 case "log":
                     Visit(context.arguments());
                     var miLog = mathType.GetMethod("Log10");
                     returnType = miLog.ReturnType;
-                    _ilg.Emit(OpCodes.Call, miLog);
+                    _ilg.EmitCall(OpCodes.Callvirt, miLog, new Type[] { });
                     break;
                 case "print":
                     Visit(context.arguments());
                     var miWrite = typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
                     returnType = miWrite.ReturnType;
-                    _ilg.Emit(OpCodes.Call, miWrite);
+                    _ilg.EmitCall(OpCodes.Callvirt, miWrite, new Type[] { });
                     break;
             }
             return returnType;

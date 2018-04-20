@@ -1,6 +1,7 @@
 ﻿
 class Animal {
 
+	@public
 	New() {
 
 	}
@@ -32,13 +33,21 @@ class Cat << Animal {
 	}
 
     @public
-	int SetCall!(string[] args) {
+	decimal SetCall!(string[] args) {
         a = 12;
         b = log(10 + a * 35 + (5.4 - 7.4));
         c = 13e-3m;
-        return (decimal)a + c;
+        return a + c;
     }
 
+	decimal ConvertDec(int i) {
+		return i + 13e-3m;
+	}
+
+	ShiftDec(decimal d) {
+		q = 10e-1m;
+		q += d;
+	}
 
 	@override
 	Foo(string message, string s1 = "bacon", string s2?) {

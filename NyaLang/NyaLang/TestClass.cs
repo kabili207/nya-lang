@@ -54,11 +54,24 @@ namespace NyaLang
             return (sbyte)-1;
         }
 
+        public decimal SetCall(string[] args)
+        {
+            int a = 12;
+            double b = Math.Log10(10 + a * 35 + (5.4 - 7.4));
+            decimal c = 13e-3m;
+            return a + c;
+        }
+
         public ulong ReturnUlong()
         {
             decimal a = 1e-3m;
 
             return 12385935794567457587UL;
+        }
+
+        decimal ConvertDec(int i)
+        {
+            return i + 13e-3m;
         }
 
     }

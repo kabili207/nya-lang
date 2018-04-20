@@ -41,7 +41,7 @@ namespace NyaLang
 
             var context = nyaParser.compilation_unit();
 
-            NyaVisitor visitor = new NyaVisitor("NyaTest", "NyaTest.exe");
+            Stage2Visitor visitor = new Stage2Visitor("NyaTest", "NyaTest.exe");
             visitor.Visit(context);
             visitor.Save();
 

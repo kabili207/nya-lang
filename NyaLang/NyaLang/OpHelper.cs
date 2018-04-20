@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace NyaLang
 {
-    static class CastHelper
+    static class OpHelper
     {
         static readonly Type[] signedPrimitives = new[] { typeof(SByte), typeof(Int16), typeof(Int32), typeof(Int64) };
         static readonly Type[] unsignedPrimitives = new[] { typeof(Byte), typeof(UInt16), typeof(UInt32), typeof(UInt64) };
@@ -24,7 +24,7 @@ namespace NyaLang
             //public OpCode[] UnsignedOverflow;
         }
 
-        static CastHelper()
+        static OpHelper()
         {
             AddPrimitiveMap(typeof(SByte), OpCodes.Conv_I1);
             AddPrimitiveMap(typeof(Int16), OpCodes.Conv_I2);
@@ -75,7 +75,7 @@ namespace NyaLang
 
             if(miOp != null)
             {
-                ilg.Emit(OpCodes.Call, miOp);
+                ilg.EmitCall(OpCodes.Call, miOp, new Type[] { });
                 return true;
             }
             return false;
@@ -131,5 +131,44 @@ namespace NyaLang
 
             return false;
         }
+
+        public static bool DoMath(ILGenerator ilg, Type tLeft, Type tRight, OpCode code, string methodName)
+        {
+
+            MethodInfo info = tLeft.GetMethod(methodName, new Type[] { tLeft, tLeft });
+
+            if (info != null)
+            {
+                if (!TryConvert(ilg, tRight, tLeft))
+                    throw new Exception("Shit's whacked, yo");
+            }
+            else
+            {
+                info = tRight.GetMethod(methodName, new Type[] { tRight, tRight });
+                if(info != null)
+                {
+                    LocalBuilder local = ilg.DeclareLocal(tRight);
+                    ilg.Emit(OpCodes.Stloc, local);
+                    if (!TryConvert(ilg, tLeft, tRight))
+                        throw new Exception("Shit's whacked, yo");
+                    ilg.Emit(OpCodes.Ldloc, local);
+                }
+            }
+
+            if (info != null)
+            {
+                ilg.Emit(OpCodes.Call, info);
+                LocalBuilder local = ilg.DeclareLocal(info.DeclaringType);
+                //ilg.Emit(OpCodes.Stloc, local);
+                //ilg.Emit(OpCodes.Ldloc, local);
+            }
+            else
+            {
+                ilg.Emit(code);
+            }
+
+            return false;
+        }
+
     }
 }

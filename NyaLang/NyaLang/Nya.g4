@@ -133,7 +133,8 @@ string_literal
 	;
 
 expression
-	: RoundLeft expression RoundRight                #parenthesisExp
+	: RoundLeft type RoundRight expression           #castExp
+	| RoundLeft expression RoundRight                #parenthesisExp
     | expression (Asterisk|Slash|Percent) expression #mulDivExp
     | expression (Plus|Minus) expression             #addSubExp
     | expression (AngleLeft AngleLeft|AngleRight AngleRight) expression #bitShiftExp
@@ -144,7 +145,6 @@ expression
     | expression Pipe Pipe expression                #logicalOrExp
 	| expression '??' expression                     #coalesceExp
     | identifier RoundLeft arguments? RoundRight     #functionExp
-	| RoundLeft type RoundRight expression           #castExp
 	| literal                                        #literalExp
     | identifier                                     #nameAtomExp
     ;
