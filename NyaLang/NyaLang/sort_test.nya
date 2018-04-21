@@ -1,0 +1,16 @@
+﻿
+class Dog << Animal {
+
+}
+
+class Animal {
+
+}
+
+class Cat << Animal {
+
+}
+
+class CatDot << Cat, Dog {
+
+}

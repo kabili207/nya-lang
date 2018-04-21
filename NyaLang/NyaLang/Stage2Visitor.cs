@@ -25,10 +25,9 @@ namespace NyaLang
 
         ScopeManager _scopeManager = new ScopeManager();
 
-        private AppDomain _appDomain;
         public AssemblyBuilder _asmBuilder;
+        private IEnumerable<ClassDescriptor> _classDescriptors;
         private ModuleBuilder _moduleBuilder;
-
         private string _outPath;
 
         private Dictionary<string, Type> typeAliases = new Dictionary<string, Type>()
@@ -39,29 +38,16 @@ namespace NyaLang
             { "decimal", typeof(decimal) }, { "object", typeof(object) }
         };
 
-        public Stage2Visitor(string assemblyName, string output)
+        public Stage2Visitor(AssemblyBuilder asmBuilder, ModuleBuilder modBuilder, IEnumerable<ClassDescriptor> descriptors)
         {
-            AssemblyName an = new AssemblyName();
-            an.Name = assemblyName;
-            _outPath = output;
-            _appDomain = AppDomain.CurrentDomain;
-            _asmBuilder = _appDomain.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave);
-            _moduleBuilder = _asmBuilder.DefineDynamicModule(an.Name, output);
-        }
-
-        public TypeBuilder CreateType(string typeName, TypeAttributes attributes)
-        {
-            return _moduleBuilder.DefineType(typeName, attributes);
+            _asmBuilder = asmBuilder;
+            _classDescriptors = descriptors;
+            _moduleBuilder = modBuilder;
         }
 
         public void SetEntryPoint(MethodBuilder builder, PEFileKinds kind)
         {
             _asmBuilder.SetEntryPoint(builder, kind);
-        }
-
-        public void Save()
-        {
-            _asmBuilder.Save(_outPath);
         }
 
         public void Visit(IParseTree tree, TypeBuilder builder)
@@ -73,51 +59,42 @@ namespace NyaLang
         public override object VisitCompilation_unit([NotNull] NyaParser.Compilation_unitContext context)
         {
             _scopeManager.Push(ScopeLevel.Global);
-            object r = base.VisitCompilation_unit(context);
+
+            foreach(var descriptor in _classDescriptors)
+            {
+                _scopeManager.Push(ScopeLevel.Class);
+
+                _currTypeBuilder = descriptor.Builder;
+
+                VisitChildren(descriptor.Context);
+
+                _currTypeBuilder.CreateType();
+
+                _currTypeBuilder = null;
+
+                _scopeManager.Pop();
+
+            }
+
+            foreach (var child in context.children.Where(x => !( x is NyaParser.Class_declarationContext)))
+            {
+                Visit(child);
+            }
+
             _moduleBuilder.CreateGlobalFunctions();
             _scopeManager.Pop();
-            return r;
+            return null;
         }
 
         public override object VisitClass_declaration([NotNull] NyaParser.Class_declarationContext context)
         {
-            string typeName = context.identifier().GetText();
-
-            _scopeManager.Push(ScopeLevel.Class);
-
-            TypeAttributes typeAttr = TypeAttributes.Class;
-            List<Type> interfaces = new List<Type>();
-
-            if (context.types() != null)
-            {
-                foreach (NyaParser.TypeContext con in context.types().children)
-                {
-                    Type t = _moduleBuilder.GetType(con.GetText());
-                    interfaces.Add(t);
-                }
-            }
-
-            Type baseClass = interfaces.FirstOrDefault();
-            if (baseClass != null && !baseClass.IsInterface)
-            {
-                interfaces.RemoveAt(0);
-            }
-
-            _currTypeBuilder = _moduleBuilder.DefineType(typeName, typeAttr, baseClass, interfaces.ToArray());
-
-            VisitChildren(context);
-
-            _currTypeBuilder.CreateType();
-
-            _currTypeBuilder = null;
-
-            _scopeManager.Pop();
-
             return null;
         }
 
         public override object VisitMethod_declaration([NotNull] NyaParser.Method_declarationContext context)
         {
+            // TODO: Break out constructor logic to new method
+
             string methodName = context.identifier().GetText();
             bool bIsEntry = false;
             bool isStatic = context.Exclamation() != null;

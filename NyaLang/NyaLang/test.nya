@@ -1,4 +1,8 @@
 ﻿
+class Dog << Animal {
+
+}
+
 class Animal {
 
 	@public

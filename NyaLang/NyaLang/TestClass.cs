@@ -17,41 +17,11 @@ namespace NyaLang
 
     class TestClass : TestBase, IFace
     {
+        const string waffle = "DLKFDJSLFDSJDS";
+
         public TestClass()
         {
             object w = null;
-        }
-
-        public void VoidReturn(string s = "bacon")
-        {
-            return;
-        }
-
-        public int? ParseInt(string s)
-        {
-            int i;
-            return int.TryParse(s, out i) ? (int?)i : null;
-        }
-
-        public char ByteToChar(byte i)
-        {
-            long l = 12L;
-            return (char)i;
-        }
-
-        public long ReturnLong(int i)
-        {
-            return long.MaxValue;
-        }
-
-        private void Foo(string message, [Optional] string s1, string s2 = "Bacon")
-        {
-            s1 = s1 ?? "Flarp";
-        }
-
-        public sbyte ReturnByte()
-        {
-            return (sbyte)-1;
         }
 
         public decimal SetCall(string[] args)

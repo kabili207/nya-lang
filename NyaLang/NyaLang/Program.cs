@@ -41,9 +41,20 @@ namespace NyaLang
 
             var context = nyaParser.compilation_unit();
 
-            Stage2Visitor visitor = new Stage2Visitor("NyaTest", "NyaTest.exe");
-            visitor.Visit(context);
-            visitor.Save();
+            AssemblyName an = new AssemblyName();
+            an.Name = "NyaTest";
+            var appDomain = AppDomain.CurrentDomain;
+            var asmBuilder = appDomain.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave);
+            var moduleBuilder = asmBuilder.DefineDynamicModule(an.Name, "NyaTest.exe");
+
+            Stage1Visitor visitor1 = new Stage1Visitor();
+            visitor1.Visit(context);
+            var descriptors = visitor1.ProcessClasses(moduleBuilder);
+
+            Stage2Visitor visitor2 = new Stage2Visitor(asmBuilder, moduleBuilder, descriptors);
+            visitor2.Visit(context);
+
+            asmBuilder.Save("NyaTest.exe");
 
             //Console.WriteLine(visitor.Visit(expressionContext));
         }
