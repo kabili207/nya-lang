@@ -1,6 +1,7 @@
 ﻿
-class Dog << Animal {
-
+@public
+interface Dog {
+	int DoThing();
 }
 
 class Animal {
@@ -25,6 +26,15 @@ class Animal {
 	}
 }
 
+class CatDog << Cat, Dog {
+
+	@public
+	int DoThing() {
+		return 10;
+	}
+}
+
+@public
 class Cat << Animal {
 
 	New() {

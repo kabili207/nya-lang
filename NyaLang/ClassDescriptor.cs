@@ -1,4 +1,5 @@
-﻿using NyaLang.Antlr;
+﻿using Antlr4.Runtime;
+using NyaLang.Antlr;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 
@@ -6,11 +7,21 @@ namespace NyaLang
 {
     public class ClassDescriptor
     {
+        public enum ClassType
+        {
+            Class,
+            Interface,
+            Enum
+        }
+
         public string Namespace { get; set; }
         public string Name { get; set; }
-        public NyaParser.Class_declarationContext Context { get; set; }
+        public ParserRuleContext Context { get; set; }
         public List<string> DependentTypeNames { get; set; }
         public TypeBuilder Builder { get; set; }
+        public NyaParser.AttributesContext Attributes { get; set; }
+        public ClassType Type { get; set; }
+
 
         public string FullName
         {

@@ -90,6 +90,11 @@ namespace NyaLang
             return null;
         }
 
+        public override object VisitInterface_declaration([NotNull] NyaParser.Interface_declarationContext context)
+        {
+            return null;
+        }
+
         public override object VisitMethod_declaration([NotNull] NyaParser.Method_declarationContext context)
         {
             // TODO: Break out constructor logic to new method
@@ -114,6 +119,8 @@ namespace NyaLang
                 methAttrs |= MethodAttributes.SpecialName;
             }
 
+            bool isFinal = true;
+
             foreach (var attr in context.attributes()?.children?
                 .OfType<NyaParser.AttributeContext>() ?? new NyaParser.AttributeContext[] { })
             {
@@ -124,11 +131,14 @@ namespace NyaLang
                         bIsEntry = true;
                         break;
                     case "public":
-                        if (isConstructor ^ isStatic)
-                        {
-                            methAttrs ^= MethodAttributes.Private;
-                            methAttrs |= MethodAttributes.Public;
-                        }
+                        methAttrs ^= MethodAttributes.Private;
+                        methAttrs |= MethodAttributes.Public;
+                        break;
+                    case "virtual":
+                        methAttrs |= MethodAttributes.Virtual;
+                        break;
+                    case "abstract":
+                        methAttrs |= MethodAttributes.Abstract;
                         break;
                 }
             }
@@ -139,7 +149,24 @@ namespace NyaLang
             Type[] paramTypes = parameters.Select(x => ParseTypeDescriptor(x.type_descriptor())).ToArray();
             Type returnType = ParseTypeDescriptor(context.type_descriptor());
 
+            MethodInfo baseMethod = FindParentDefinition(_currTypeBuilder, methodName, paramTypes);
+
             MethodBuilder methodBuilder;
+
+            if(baseMethod != null)
+            {
+                if (baseMethod.IsVirtual && !baseMethod.IsFinal)
+                {
+                    if ((methAttrs & MethodAttributes.Virtual) != MethodAttributes.Virtual)
+                        methAttrs |= MethodAttributes.Final;
+                    methAttrs |= MethodAttributes.Virtual;
+                    if (!baseMethod.DeclaringType.IsInterface)
+                        methAttrs |= MethodAttributes.NewSlot;
+
+                    if ((methAttrs & MethodAttributes.Public) != MethodAttributes.Public)
+                        throw new Exception("Oy! This needs to be public!");
+                }
+            }
 
             if (_currTypeBuilder != null)
             {
@@ -147,6 +174,7 @@ namespace NyaLang
             }
             else
             {
+                methAttrs |= MethodAttributes.Static;
                 methodBuilder = _moduleBuilder.DefineGlobalMethod(methodName, methAttrs, returnType, paramTypes);
             }
 
@@ -221,6 +249,108 @@ namespace NyaLang
             _ilg.Emit(OpCodes.Ret);
 
             _ilg = null;
+
+            _scopeManager.Pop();
+
+            return methodBuilder;
+        }
+
+        private MethodInfo FindParentDefinition(Type t, string name, Type[] methodArgs)
+        {
+            if (t == null)
+                return null;
+            MethodInfo info = null;
+            if (t.BaseType != null)
+            {
+                info = _currTypeBuilder.BaseType.GetMethod(name, methodArgs);
+                if (info != null)
+                    return info;
+                info = FindParentDefinition(t.BaseType, name, methodArgs);
+            } else
+            {
+                info = typeof(object).GetMethod(name, methodArgs);
+            }
+            if (info != null)
+                return info;
+
+            foreach(var iface in t.GetInterfaces())
+            {
+                info = iface.GetMethod(name, methodArgs);
+                if (info != null)
+                    return info;
+                info = FindParentDefinition(iface, name, methodArgs);
+                if (info != null)
+                    return info;
+            }
+            return null;
+        }
+
+        public override object VisitInterface_method_declaration([NotNull] NyaParser.Interface_method_declarationContext context)
+        {
+            // TODO: Break out constructor logic to new method
+
+            string methodName = context.identifier().GetText();
+
+            _scopeManager.Push(ScopeLevel.Method);
+
+            MethodAttributes methAttrs = MethodAttributes.Public | MethodAttributes.HideBySig |
+                MethodAttributes.Abstract | MethodAttributes.Virtual | MethodAttributes.NewSlot;
+
+
+            foreach (var attr in context.attributes()?.children?
+                .OfType<NyaParser.AttributeContext>() ?? new NyaParser.AttributeContext[] { })
+            {
+                string attrName = attr.identifier().GetText();
+                switch (attrName)
+                {
+                    case "public":
+                        break;
+                }
+            }
+
+            var parameters = context.fixed_parameters()?.children?
+                .OfType<NyaParser.Fixed_parameterContext>() ?? new NyaParser.Fixed_parameterContext[] { };
+
+            Type[] paramTypes = parameters.Select(x => ParseTypeDescriptor(x.type_descriptor())).ToArray();
+            Type returnType = ParseTypeDescriptor(context.type_descriptor());
+
+            MethodBuilder methodBuilder;
+
+            methodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs, returnType, paramTypes);
+
+            for (int i = 0; i < parameters.Count(); i++)
+            {
+                var param = parameters.ElementAt(i);
+                string paramName = param.identifier().GetText();
+
+                ParameterAttributes pAttrs = ParameterAttributes.None;
+
+                ParameterBuilder pb = methodBuilder.DefineParameter(i + 1, pAttrs, paramName);
+                _scopeManager.AddVariable(paramName, pb, paramTypes[i]);
+
+                if (param.Question() != null || param.literal() != null)
+                {
+                    pb.SetCustomAttribute(
+                        new CustomAttributeBuilder(
+                            typeof(OptionalAttribute).GetConstructor(new Type[] { }),
+                            new object[] { })
+                    );
+
+                    if (param.literal() != null)
+                    {
+                        object o = Visit(param.literal());
+
+                        if (o != null)
+                        {
+                            pb.SetCustomAttribute(
+                                new CustomAttributeBuilder(
+                                    typeof(DefaultParameterValueAttribute).GetConstructor(new Type[] { typeof(Object) }),
+                                    new object[] { o })
+                            );
+                        }
+                    }
+                }
+            }
 
             _scopeManager.Pop();
 

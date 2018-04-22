@@ -25,6 +25,14 @@ namespace NyaLang
             return r;
         }
 
+        public override object VisitType_delcaration([NotNull] NyaParser.Type_delcarationContext context)
+        {
+            var obj = base.VisitType_delcaration(context) as ClassDescriptor;
+            obj.Attributes = context.attributes();
+            classes.Add(obj);
+            return null;
+        }
+
         public override object VisitClass_declaration([NotNull] NyaParser.Class_declarationContext context)
         {
             string typeName = context.identifier().GetText();
@@ -38,14 +46,37 @@ namespace NyaLang
                 }
             }
 
-            classes.Add(new ClassDescriptor()
+            return new ClassDescriptor()
             {
                 Namespace = _currentNamespace,
                 Name = typeName,
                 Context = context,
-                DependentTypeNames = dependentTypes
-            });
-            return null;
+                DependentTypeNames = dependentTypes,
+                Type = ClassDescriptor.ClassType.Class
+            };
+        }
+
+        public override object VisitInterface_declaration([NotNull] NyaParser.Interface_declarationContext context)
+        {
+            string typeName = context.identifier().GetText();
+            List<string> dependentTypes = new List<string>();
+
+            if (context.types() != null)
+            {
+                foreach (NyaParser.TypeContext con in context.types().children.OfType<NyaParser.TypeContext>())
+                {
+                    dependentTypes.Add(con.GetText());
+                }
+            }
+
+            return new ClassDescriptor()
+            {
+                Namespace = _currentNamespace,
+                Name = typeName,
+                Context = context,
+                DependentTypeNames = dependentTypes,
+                Type = ClassDescriptor.ClassType.Class
+            };
         }
 
         private Type ResolveType(string name)
@@ -64,8 +95,33 @@ namespace NyaLang
 
             foreach (var descriptor in sortedClasses)
             {
+                TypeAttributes typeAttr = TypeAttributes.NotPublic;
 
-                TypeAttributes typeAttr = TypeAttributes.Class;
+                if (descriptor.Context is NyaParser.Class_declarationContext)
+                {
+                    typeAttr |= TypeAttributes.Class;
+                }
+                else if (descriptor.Context is NyaParser.Interface_declarationContext)
+                {
+                    typeAttr |= TypeAttributes.Interface | TypeAttributes.Abstract;
+                }
+
+                foreach (var attr in descriptor.Attributes?.children?
+                    .OfType<NyaParser.AttributeContext>() ?? new NyaParser.AttributeContext[] { })
+                {
+                    string attrName = attr.identifier().GetText();
+                    switch (attrName)
+                    {
+                        case "abstract":
+                            typeAttr |= TypeAttributes.Abstract;
+                            break;
+                        case "public":
+                            typeAttr ^= TypeAttributes.NotPublic;
+                            typeAttr |= TypeAttributes.Public;
+                            break;
+                    }
+                }
+
                 List<Type> interfaces = new List<Type>();
 
                 foreach (var con in descriptor.DependentTypeNames)
@@ -74,13 +130,14 @@ namespace NyaLang
                 }
 
                 Type baseClass = interfaces.FirstOrDefault();
-                if (baseClass != null && !baseClass.IsInterface)
+                if ((typeAttr & TypeAttributes.Interface) != TypeAttributes.Interface &&
+                    baseClass != null && !baseClass.IsInterface)
                 {
                     interfaces.RemoveAt(0);
                 }
 
                 descriptor.Builder = builder.DefineType(descriptor.FullName, typeAttr, baseClass, interfaces.ToArray());
-
+                Type t = typeof(IFace);
             }
 
             return sortedClasses;

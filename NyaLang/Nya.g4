@@ -15,7 +15,7 @@ unit_declaration
 	;
 
 type_delcaration
-	: attributes? (class_declaration)
+	: attributes? (class_declaration | interface_declaration)
 	;
 
 class_declaration
@@ -34,8 +34,28 @@ class_member_declaration
 	: (method_declaration)
 	;
 
+interface_declaration
+	: 'interface' identifier ('<<' types)? interface_body
+	;
+
+interface_body
+	: CurlyLeft interface_member_declarations? CurlyRight
+	;
+
+interface_member_declarations
+	: interface_member_declaration+
+	;
+
+interface_member_declaration
+	: (interface_method_declaration)
+	;
+
 method_declaration
 	: attributes? type_descriptor? identifier Exclamation? RoundLeft fixed_parameters? RoundRight block
+	;
+
+interface_method_declaration
+	: attributes? type_descriptor? identifier Exclamation? RoundLeft fixed_parameters? RoundRight ';'
 	;
 
 attributes
