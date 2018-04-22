@@ -18,7 +18,6 @@ namespace NyaLang
         const string NullKeyword = "nil";
 
         TypeBuilder _currTypeBuilder = null;
-        MethodBuilder _currMethodBuilder = null;
         ILGenerator _ilg = null;
         Label returnLabel;
 
@@ -140,14 +139,15 @@ namespace NyaLang
             Type[] paramTypes = parameters.Select(x => ParseTypeDescriptor(x.type_descriptor())).ToArray();
             Type returnType = ParseTypeDescriptor(context.type_descriptor());
 
+            MethodBuilder methodBuilder;
 
             if (_currTypeBuilder != null)
             {
-                _currMethodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs, returnType, paramTypes);
+                methodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs, returnType, paramTypes);
             }
             else
             {
-                _currMethodBuilder = _moduleBuilder.DefineGlobalMethod(methodName, methAttrs, returnType, paramTypes);
+                methodBuilder = _moduleBuilder.DefineGlobalMethod(methodName, methAttrs, returnType, paramTypes);
             }
 
             for (int i = 0; i < parameters.Count(); i++)
@@ -157,7 +157,7 @@ namespace NyaLang
 
                 ParameterAttributes pAttrs = ParameterAttributes.None;
 
-                ParameterBuilder pb = _currMethodBuilder.DefineParameter(i + 1, pAttrs, paramName);
+                ParameterBuilder pb = methodBuilder.DefineParameter(i + 1, pAttrs, paramName);
                 _scopeManager.AddVariable(paramName, pb, paramTypes[i]);
 
                 if (param.Question() != null || param.literal() != null)
@@ -185,9 +185,9 @@ namespace NyaLang
             }
 
             if (bIsEntry)
-                SetEntryPoint(_currMethodBuilder, PEFileKinds.ConsoleApplication);
+                SetEntryPoint(methodBuilder, PEFileKinds.ConsoleApplication);
 
-            _ilg = _currMethodBuilder.GetILGenerator();
+            _ilg = methodBuilder.GetILGenerator();
 
             returnLabel = _ilg.DefineLabel();
 
@@ -224,7 +224,7 @@ namespace NyaLang
 
             _scopeManager.Pop();
 
-            return _currMethodBuilder;
+            return methodBuilder;
         }
 
         private Type ParseType(NyaParser.TypeContext context)
@@ -474,7 +474,7 @@ namespace NyaLang
         {
             Visit(context.expression());
             _ilg.Emit(OpCodes.Br_S, returnLabel);
-            return _currMethodBuilder.ReturnType;
+            return null;
         }
 
         public override object VisitAssignment([NotNull] NyaParser.AssignmentContext context)
