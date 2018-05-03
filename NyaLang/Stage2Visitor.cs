@@ -67,6 +67,8 @@ namespace NyaLang
 
                 VisitChildren(descriptor.Context);
 
+                // TODO: Check constructor visibility
+
                 _currTypeBuilder.CreateType();
 
                 _currTypeBuilder = null;
@@ -165,6 +167,10 @@ namespace NyaLang
 
                     if ((methAttrs & MethodAttributes.Public) != MethodAttributes.Public)
                         throw new Exception("Oy! This needs to be public!");
+                }
+                if (methodName == ".ctor" && !baseMethod.IsPublic)
+                {
+                    throw new Exception("Oy! The base constructor needs to be public!");
                 }
             }
 
@@ -755,32 +761,46 @@ namespace NyaLang
 
             String name = context.identifier().GetText();
             Type returnType = null;
-
+            Type[] argTypes;
             Type mathType = typeof(Math);
 
             switch (name)
             {
                 case "sqrt":
-                    Visit(context.arguments());
-                    var miSqrt = mathType.GetMethod("Sqrt");
+                    argTypes = new[] { typeof(double) };
+                    VisitAndConvertArgs(context, argTypes);
+                    var miSqrt = mathType.GetMethod("Sqrt", argTypes);
                     returnType = miSqrt.ReturnType;
-                    _ilg.EmitCall(OpCodes.Callvirt, miSqrt, new Type[] { });
+                    _ilg.EmitCall(OpCodes.Call, miSqrt, new Type[] { });
                     break;
 
                 case "log":
-                    Visit(context.arguments());
-                    var miLog = mathType.GetMethod("Log10");
+                    argTypes = new[] { typeof(double) };
+                    VisitAndConvertArgs(context, argTypes);
+                    var miLog = mathType.GetMethod("Log10", argTypes);
                     returnType = miLog.ReturnType;
-                    _ilg.EmitCall(OpCodes.Callvirt, miLog, new Type[] { });
+                    _ilg.EmitCall(OpCodes.Call, miLog, new Type[] { });
                     break;
                 case "print":
-                    Visit(context.arguments());
-                    var miWrite = typeof(Console).GetMethod("WriteLine", new Type[] { typeof(string) });
+                    argTypes = new[] { typeof(string) };
+                    VisitAndConvertArgs(context, argTypes);
+                    var miWrite = typeof(Console).GetMethod("WriteLine", argTypes);
                     returnType = miWrite.ReturnType;
-                    _ilg.EmitCall(OpCodes.Callvirt, miWrite, new Type[] { });
+                    _ilg.EmitCall(OpCodes.Call, miWrite, new Type[] { });
                     break;
             }
             return returnType;
+        }
+
+        private void VisitAndConvertArgs(NyaParser.FunctionExpContext context, Type[] argTypes)
+        {
+            var args = context.arguments().children.OfType<NyaParser.ArgumentContext>().ToList();
+            for (int i = 0; i < args.Count; i++)
+            {
+                Type t = (Type)Visit(args[i]);
+                if (t != argTypes[i])
+                    OpHelper.TryConvert(_ilg, t, argTypes[i]);
+            }
         }
     }
 }

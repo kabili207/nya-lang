@@ -5,38 +5,76 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace NyaLang
+namespace NyaLang.Test
 {
-    interface IFace { }
-    class TestBase {
-        public TestBase()
+    public interface Dog
+    {
+        int DoThing();
+    }
+    public class Animal
+    {
+
+        public Animal()
+        {
+
+        }
+
+        static Animal()
+        {
+
+        }
+
+        public virtual void Foo()
+        {
+
+        }
+
+        public void
+        Bar()
         {
 
         }
     }
 
-    class TestClass : TestBase, IFace
-    {
-        const string waffle = "DLKFDJSLFDSJDS";
 
-        public TestClass()
+    class CatDog : Cat, Dog {
+
+
+        public int DoThing()
+        {
+            return 10;
+        }
+    }
+
+
+    public class Cat : Animal
+    {
+
+        public Cat()
         {
             object w = null;
         }
 
-        public decimal SetCall(string[] args)
+        static Cat()
         {
-            int a = 12;
-            double b = Math.Log10(10 + a * 35 + (5.4 - 7.4));
-            decimal c = 13e-3m;
+            //var a = 12 ?? 4;
+        }
+
+        public static
+        decimal SetCall(string[] args)
+        {
+            var a = 12;
+            var b = Math.Log10(10 + a * 35 + (5.4 - 7.4));
+            var c = 13e-3m;
             return a + c;
         }
 
-        public ulong ReturnUlong()
-        {
-            decimal a = 1e-3m;
 
-            return 12385935794567457587UL;
+        public static
+        void SetCall1(string[] args)
+        {
+            var a = 12;
+            var b = Math.Log10(10 + a * 35 + (7.4f));
         }
 
         decimal ConvertDec(int i)
@@ -44,5 +82,19 @@ namespace NyaLang
             return i + 13e-3m;
         }
 
+        void ShiftDec(decimal d)
+        {
+            var q = 10e-1m;
+            q += d;
+        }
+
+        void Foo(string message, string s2, string s1 = "bacon")
+        {
+            s1 = s1 ?? "waffle";
+            //var s = 0;
+            //var s ?= 12;
+            var t = null ?? "herp";
+        }
     }
+
 }

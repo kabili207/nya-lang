@@ -137,7 +137,6 @@ namespace NyaLang
                 }
 
                 descriptor.Builder = builder.DefineType(descriptor.FullName, typeAttr, baseClass, interfaces.ToArray());
-                Type t = typeof(IFace);
             }
 
             return sortedClasses;

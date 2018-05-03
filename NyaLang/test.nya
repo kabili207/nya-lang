@@ -37,6 +37,7 @@ class CatDog << Cat, Dog {
 @public
 class Cat << Animal {
 
+	@public
 	New() {
 		w = nil;
 	}
@@ -52,6 +53,12 @@ class Cat << Animal {
         b = log(10 + a * 35 + (5.4 - 7.4));
         c = 13e-3m;
         return a + c;
+    }
+
+    @public
+	SetCall1!(string[] args) {
+        a = 12;
+        b = log(10 + a * 35 + (7.4));
     }
 
 	decimal ConvertDec(int i) {

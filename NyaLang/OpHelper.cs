@@ -164,6 +164,14 @@ namespace NyaLang
             }
             else
             {
+                if (tLeft != tRight)
+                {
+                    LocalBuilder local = ilg.DeclareLocal(tRight);
+                    ilg.Emit(OpCodes.Stloc, local);
+                    if (!TryConvert(ilg, tLeft, tRight))
+                        throw new Exception("Shit's whacked, yo");
+                    ilg.Emit(OpCodes.Ldloc, local);
+                }
                 ilg.Emit(code);
             }
 
