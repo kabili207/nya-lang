@@ -615,23 +615,22 @@ namespace NyaLang
 
         public override object VisitAssignment([NotNull] NyaParser.AssignmentContext context)
         {
+            switch (context.assignment_operator().GetText())
+            {
+                case "=":
+                    return DoBasicAssignment(context);
+                case "?=":
+                    return DoCoalesceAssignment(context);
+                default:
+                    return DoArithmenticAssignment(context);
+            }
+        }
+
+        private Type DoBasicAssignment(NyaParser.AssignmentContext context)
+        {
             string sLocal = context.identifier().GetText();
-            string sOperator = context.assignment_operator().GetText();
 
             Variable local = _scopeManager.FindVariable(sLocal);
-
-            Label nullOp = _ilg.DefineLabel();
-
-            if (sOperator != "=")
-            {
-                local.Load(_ilg);
-                if (sOperator == "?=")
-                {
-                    _ilg.Emit(OpCodes.Dup);
-                    _ilg.Emit(OpCodes.Brtrue_S, nullOp);
-                    _ilg.Emit(OpCodes.Pop);
-                }
-            }
 
             Type src = (Type)Visit(context.expression());
             Type dst = null;
@@ -655,8 +654,21 @@ namespace NyaLang
                 _scopeManager.AddVariable(sLocal, local);
             }
 
-            if (sOperator == "?=" && !OpHelper.TryConvert(_ilg, src, local.Type))
-                throw new Exception("Shit's whacked, yo");
+            local.Store(_ilg);
+
+            return local.Type;
+        }
+
+        private Type DoArithmenticAssignment(NyaParser.AssignmentContext context)
+        {
+            string sOperator = context.assignment_operator().GetText();
+            string sLocal = context.identifier().GetText();
+            Variable local = _scopeManager.FindVariable(sLocal);
+
+            local.Load(_ilg);
+
+            Type src = (Type)Visit(context.expression());
+            Type dst = local.Type;
 
             switch (sOperator)
             {
@@ -670,8 +682,32 @@ namespace NyaLang
                 case "^=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Xor, "op_ExclusiveOr"); break;
                 case "<<=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Shl, "op_LeftShift"); break;
                 case ">>=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Shr, "op_RightShift"); break;
-                case "?=": _ilg.MarkLabel(nullOp); break;
             }
+
+            local.Store(_ilg);
+
+            return local.Type;
+        }
+
+        private Type DoCoalesceAssignment(NyaParser.AssignmentContext context)
+        {
+            string sLocal = context.identifier().GetText();
+            Variable local = _scopeManager.FindVariable(sLocal);
+
+            Label nullOp = _ilg.DefineLabel();
+
+            local.Load(_ilg);
+                    _ilg.Emit(OpCodes.Dup);
+                    _ilg.Emit(OpCodes.Brtrue_S, nullOp);
+                    _ilg.Emit(OpCodes.Pop);
+
+            Type src = (Type)Visit(context.expression());
+            Type dst = local.Type;
+
+            if (!OpHelper.TryConvert(_ilg, src, local.Type))
+                throw new Exception("Shit's whacked, yo");
+
+            _ilg.MarkLabel(nullOp);
 
             local.Store(_ilg);
 
