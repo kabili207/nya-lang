@@ -83,6 +83,9 @@ namespace NyaLang
             }
 
             _moduleBuilder.CreateGlobalFunctions();
+
+            SetAssemblyVersionInfo();
+
             _scopeManager.Pop();
             return null;
         }
@@ -95,6 +98,61 @@ namespace NyaLang
         public override object VisitInterface_declaration([NotNull] NyaParser.Interface_declarationContext context)
         {
             return null;
+        }
+
+        private Type FindType(string name, string[] namespaces = null)
+        {
+            if (namespaces == null)
+                namespaces = new string[] { };
+            Type t = _asmBuilder.GetType(name) ?? Type.GetType(name);
+
+            if (t == null)
+            {
+                foreach (string ns in namespaces)
+                {
+                    t = _asmBuilder.GetType(ns + '.' + name) ?? Type.GetType(ns + '.' + name);
+                    if (t != null)
+                        break;
+                }
+            }
+
+            return t;
+        }
+
+        private void SetAssemblyVersionInfo()
+        {
+            // TODO: Others magic assembly stuff
+            AssemblyDetail detail = new AssemblyDetail(_asmBuilder);
+            _asmBuilder.DefineVersionInfoResource();
+        }
+
+        public override object VisitGlobal_attribute([NotNull] NyaParser.Global_attributeContext context)
+        {
+            string typeName = context.identifier().GetText();
+            if (!typeName.EndsWith("Attribute"))
+                typeName += "Attribute";
+
+            Type type = FindType(typeName, new[] { "System", "System.Reflection", "System.InteropServices" });
+
+            List<object> conArgs = new List<object>();
+
+            foreach(var arg in context.attribute_arguments().children.OfType<NyaParser.Attribute_argumentContext>())
+            {
+                var identifier = arg.identifier();
+                if(identifier == null)
+                {
+                    conArgs.Add(Visit(arg.literal()));
+                }
+            }
+
+            ConstructorInfo cInfo = type.GetConstructor(conArgs.Select(x => x.GetType()).ToArray());
+
+            if(cInfo != null)
+            {
+                _asmBuilder.SetCustomAttribute(new CustomAttributeBuilder(cInfo, conArgs.ToArray()));
+            }
+
+            return base.VisitGlobal_attribute(context);
         }
 
         public override object VisitMethod_declaration([NotNull] NyaParser.Method_declarationContext context)

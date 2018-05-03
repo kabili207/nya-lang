@@ -3,6 +3,7 @@ grammar Nya;
 
 compilation_unit
 	: unit_declarations
+	| global_attribute*
 	;
 
 unit_declarations
@@ -63,7 +64,27 @@ attributes
 	;
 
 attribute
-	: At identifier
+	: At (attribute_target ':')? identifier (RoundLeft attribute_arguments? RoundRight)?
+	;
+
+global_attribute
+	: '@@' (global_attribute_target ':')? identifier (RoundLeft attribute_arguments? RoundRight)?
+	;
+
+global_attribute_target
+	: 'assembly' | 'module'
+	;
+
+attribute_target
+	: 'field' | 'event' | 'method' | 'param' | 'property' | 'return' | 'type'
+	;
+
+attribute_arguments
+	: attribute_argument (','  attribute_argument)*
+	;
+
+attribute_argument
+	: (identifier ':')? literal
 	;
 
 fixed_parameters

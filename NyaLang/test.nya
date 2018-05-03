@@ -1,4 +1,11 @@
 ﻿
+@@AssemblyTitle("NyaTest")
+@@AssemblyProduct("NyaTest")
+@@AssemblyDescription("Test output for the Nya compiler")
+@@AssemblyCopyright("Copyright © Amy Nagle 2018")
+@@AssemblyCompany("Muffin Tech")
+@@AssemblyInformationalVersion("0.2b")
+
 @public
 interface Dog {
 	int DoThing();
