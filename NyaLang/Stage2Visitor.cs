@@ -493,6 +493,8 @@ namespace NyaLang
                 EmitInt((uint)o);
             else if (o is ulong)
                 EmitInt((ulong)o);
+            else if (o is Regex)
+                EmitRegex((Regex)o);
 
             return o.GetType();
         }
@@ -662,6 +664,32 @@ namespace NyaLang
                 default:
                     return int.Parse(value);
             }
+        }
+
+        private void EmitRegex(Regex r)
+        {
+            ConstructorInfo ctor1 = typeof(Regex).GetConstructor(
+                new Type[] {
+                    typeof(String),
+                    typeof(RegexOptions)
+                }
+            );
+
+            _ilg.Emit(OpCodes.Nop);
+            _ilg.Emit(OpCodes.Ldstr, r.ToString());
+            _ilg.Emit(OpCodes.Ldc_I4, (int)r.Options);
+            _ilg.Emit(OpCodes.Newobj, ctor1);
+        }
+
+        public override object VisitRegexLiteral([NotNull] NyaParser.RegexLiteralContext context)
+        {
+            string raw = context.GetText();
+            int start = raw.IndexOf('/');
+            int end = raw.LastIndexOf('/');
+            string regex = raw.Substring(start+1, raw.Length - start -2);
+            string flags = raw.Substring(end + 1);
+
+            return new Regex(regex);
         }
 
         public override object VisitReturnStatement([NotNull] NyaParser.ReturnStatementContext context)

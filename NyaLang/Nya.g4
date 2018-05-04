@@ -3,7 +3,6 @@ grammar Nya;
 
 compilation_unit
 	: unit_declarations
-	| global_attribute*
 	;
 
 unit_declarations
@@ -13,6 +12,7 @@ unit_declarations
 unit_declaration
 	: type_delcaration
 	| method_declaration
+	| global_attribute
 	;
 
 type_delcaration
@@ -160,6 +160,7 @@ literal
 	| HEX_INTEGER_LITERAL  #hexIntLiteral
 	| REAL_LITERAL         #realLiteral
 	| CHARACTER_LITERAL    #charLiteral
+	| REGEX_LITERAL        #regexLiteral
 	| NULL                 #nullLiteral
 	;
 
@@ -207,6 +208,14 @@ LITERAL_ACCESS:      [0-9]+ IntegerTypeSuffix? '.' IdentifierOrKeyword;
 INTEGER_LITERAL:     [0-9]+ IntegerTypeSuffix?;
 HEX_INTEGER_LITERAL: '0' [xX] HexDigit+ IntegerTypeSuffix?;
 REAL_LITERAL:        [0-9]* '.' [0-9]+ ExponentPart? [FfDdMm]? | [0-9]+ ([FfDdMm] | ExponentPart [FfDdMm]?);
+
+/* Original - REGEX_LITERAL:       '/' RegularExpressionChar+ {IsRegexPossible()}? '/' IdentifierPart*; */
+
+REGEX_LITERAL:       '/' RegexContent '/';
+
+fragment RegexContent
+	: RegexChar+
+	;
 
 CHARACTER_LITERAL:                   '\'' (~['\\\r\n\u0085\u2028\u2029] | CommonCharacter) '\'';
 REGULAR_STRING:                      '"'  (~["\\\r\n\u0085\u2028\u2029] | CommonCharacter)* '"';
@@ -333,6 +342,17 @@ fragment UnicodeClassZS
 	;
 
 
-
+fragment RegexChar
+    : ~[\r\n\u2028\u2029\\/[]
+    | RegexBackslashSequence
+    | '[' RegexClassChar* ']'
+    ;
+fragment RegexClassChar
+    : ~[\r\n\u2028\u2029\]\\]
+    | RegexBackslashSequence
+    ;
+fragment RegexBackslashSequence
+    : '\\' ~[\r\n\u2028\u2029]
+    ;
 
 Any : . ;

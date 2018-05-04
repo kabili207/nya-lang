@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace NyaLang.Test
@@ -42,6 +43,7 @@ namespace NyaLang.Test
 
         public int DoThing()
         {
+            Regex regex = new Regex("a[^6q]cf?", RegexOptions.IgnoreCase | RegexOptions.Multiline);
             return 10;
         }
     }
