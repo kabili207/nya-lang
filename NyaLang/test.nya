@@ -37,7 +37,7 @@ class CatDog << Cat, Dog {
 
 	@public
 	int DoThing() {
-		q = /a[^6q]cf?/;
+		q = /a[^6q]cf?/ix;
 		return 10;
 	}
 }

@@ -211,10 +211,14 @@ REAL_LITERAL:        [0-9]* '.' [0-9]+ ExponentPart? [FfDdMm]? | [0-9]+ ([FfDdMm
 
 /* Original - REGEX_LITERAL:       '/' RegularExpressionChar+ {IsRegexPossible()}? '/' IdentifierPart*; */
 
-REGEX_LITERAL:       '/' RegexContent '/';
+REGEX_LITERAL:       '/' RegexContent '/' RegexFlag*;
 
 fragment RegexContent
 	: RegexChar+
+	;
+
+fragment RegexFlag
+	: 'i' | 'm' | 'n' | 's' | 'x'
 	;
 
 CHARACTER_LITERAL:                   '\'' (~['\\\r\n\u0085\u2028\u2029] | CommonCharacter) '\'';

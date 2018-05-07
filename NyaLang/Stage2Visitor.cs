@@ -686,10 +686,33 @@ namespace NyaLang
             string raw = context.GetText();
             int start = raw.IndexOf('/');
             int end = raw.LastIndexOf('/');
-            string regex = raw.Substring(start+1, raw.Length - start -2);
+            string regex = raw.Substring(start+1, end - 1);
             string flags = raw.Substring(end + 1);
 
-            return new Regex(regex);
+            RegexOptions options = RegexOptions.None;
+            foreach(var flag in flags)
+            {
+                switch (flag)
+                {
+                    case 'm':
+                        options |= RegexOptions.Multiline;
+                        break;
+                    case 'i':
+                        options |= RegexOptions.IgnoreCase;
+                        break;
+                    case 's':
+                        options |= RegexOptions.Singleline;
+                        break;
+                    case 'x':
+                        options |= RegexOptions.IgnorePatternWhitespace;
+                        break;
+                    case 'n':
+                        options |= RegexOptions.ExplicitCapture;
+                        break;
+                }
+            }
+
+            return new Regex(regex, options);
         }
 
         public override object VisitReturnStatement([NotNull] NyaParser.ReturnStatementContext context)
