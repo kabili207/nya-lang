@@ -20,6 +20,7 @@ namespace NyaLang
         TypeBuilder _currTypeBuilder = null;
         ILGenerator _ilg = null;
         Label returnLabel;
+        int _stackDepth = 0;
 
 
         ScopeManager _scopeManager = new ScopeManager();
@@ -302,6 +303,12 @@ namespace NyaLang
             if (block != null && block.ChildCount > 0)
             {
                 Visit(block);
+                while(_stackDepth > 0)
+                {
+                    // Clean up after the user
+                    _ilg.Emit(OpCodes.Pop);
+                    _stackDepth--;
+                }
             }
             else
             {
@@ -461,7 +468,8 @@ namespace NyaLang
 
         private Type EmitLiteral(object o)
         {
-            if(o == null)
+            _stackDepth++;
+            if (o == null)
             {
                 _ilg.Emit(OpCodes.Ldnull);
                 return null;
@@ -717,7 +725,12 @@ namespace NyaLang
 
         public override object VisitReturnStatement([NotNull] NyaParser.ReturnStatementContext context)
         {
-            Visit(context.expression());
+            var exp = context.expression();
+            if (exp != null)
+            {
+                Visit(exp);
+                _stackDepth--;
+            }
             _ilg.Emit(OpCodes.Br_S, returnLabel);
             return null;
         }
@@ -764,6 +777,7 @@ namespace NyaLang
             }
 
             local.Store(_ilg);
+            _stackDepth--;
 
             return local.Type;
         }
@@ -775,6 +789,7 @@ namespace NyaLang
             Variable local = _scopeManager.FindVariable(sLocal);
 
             local.Load(_ilg);
+            _stackDepth++;
 
             Type src = (Type)Visit(context.expression());
             Type dst = local.Type;
@@ -794,6 +809,7 @@ namespace NyaLang
             }
 
             local.Store(_ilg);
+            _stackDepth -= 2;
 
             return local.Type;
         }
@@ -806,9 +822,10 @@ namespace NyaLang
             Label nullOp = _ilg.DefineLabel();
 
             local.Load(_ilg);
-                    _ilg.Emit(OpCodes.Dup);
-                    _ilg.Emit(OpCodes.Brtrue_S, nullOp);
-                    _ilg.Emit(OpCodes.Pop);
+            _stackDepth++;
+            _ilg.Emit(OpCodes.Dup);
+            _ilg.Emit(OpCodes.Brtrue_S, nullOp);
+            _ilg.Emit(OpCodes.Pop);
 
             Type src = (Type)Visit(context.expression());
             Type dst = local.Type;
@@ -819,6 +836,8 @@ namespace NyaLang
             _ilg.MarkLabel(nullOp);
 
             local.Store(_ilg);
+
+            _stackDepth -= 2;
 
             return local.Type;
         }
@@ -834,6 +853,7 @@ namespace NyaLang
             string sLocal = context.identifier().GetText();
             Variable v = _scopeManager.FindVariable(sLocal);
             v.Load(_ilg);
+            _stackDepth++;
             return v.Type;
         }
 
@@ -864,6 +884,7 @@ namespace NyaLang
                 throw new Exception("Shit's whacked, yo");
 
             _ilg.MarkLabel(jmp);
+            _stackDepth--;
 
             return tLeft ?? tRight;
         }
@@ -882,6 +903,7 @@ namespace NyaLang
             if (context.Percent() != null)
                 OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Rem, "op_Modulus");
 
+            _stackDepth--;
             return tLeft;
         }
 
@@ -897,6 +919,7 @@ namespace NyaLang
             if (context.Minus() != null)
                 OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Sub, "op_Subtraction");
 
+            _stackDepth--;
             return tLeft;
         }
 
@@ -915,6 +938,7 @@ namespace NyaLang
 
                 ConstructorInfo cinfo = retType.GetConstructor(argTypes);
                 _ilg.Emit(OpCodes.Newobj, cinfo);
+                _stackDepth++;
                 return retType;
             }
 
@@ -941,6 +965,7 @@ namespace NyaLang
             {
                 callingType = _currTypeBuilder;
                 _ilg.Emit(OpCodes.Ldarg_0);
+                _stackDepth++;
             }
             else
             {
@@ -955,6 +980,7 @@ namespace NyaLang
             {
                 // I hope this works
                 _ilg.Emit(OpCodes.Pop);
+                _stackDepth--;
             }
 
             return retType;
@@ -977,7 +1003,7 @@ namespace NyaLang
             methodTypeStack.Push(objType);
             Type retType = (Type)Visit(member);
             methodTypeStack.Pop();
-
+            _stackDepth--;
             return retType;
         }
 
@@ -1031,6 +1057,9 @@ namespace NyaLang
             OpCode op = method.IsStatic ? OpCodes.Call : OpCodes.Callvirt;
             _ilg.EmitCall(op, method, typeParams);
             wasStatic = method.IsStatic;
+            _stackDepth -= argTypes.Length;
+            if (method.ReturnType != typeof(void))
+                _stackDepth++;
             return method.ReturnType;
         }
 

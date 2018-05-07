@@ -43,7 +43,7 @@ class CatDog << Cat, Dog {
 
 	TestNew() {
 		c = new Cat();
-		b = c.ConvertDec(12);
+		c.ConvertDec(12);
 	}
 }
 
