@@ -186,8 +186,9 @@ expression
     | expression Ampersand Ampersand expression      #logicalAndExp
     | expression Pipe Pipe expression                #logicalOrExp
 	| expression '??' expression                     #coalesceExp
-    | identifier RoundLeft arguments? RoundRight     #functionExp
+    | NEW? identifier RoundLeft arguments? RoundRight     #functionExp
 	| literal                                        #literalExp
+	| expression '.' expression                      #memberExp
     | identifier                                     #nameAtomExp
     ;
 
@@ -201,6 +202,7 @@ identifier
 TRUE                : 'true' ;
 FALSE               : 'false' ;
 NULL                : 'nil' ;
+NEW                 : 'new' ;
 
 IDENTIFIER:          IdentifierOrKeyword;
 

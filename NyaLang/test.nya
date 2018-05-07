@@ -40,6 +40,11 @@ class CatDog << Cat, Dog {
 		q = /a[^6q]cf?/ix;
 		return 10;
 	}
+
+	TestNew() {
+		c = new Cat();
+		b = c.ConvertDec(12);
+	}
 }
 
 @public
@@ -69,6 +74,7 @@ class Cat << Animal {
         b = log(10 + a * 35 + (7.4));
     }
 
+	@public
 	decimal ConvertDec(int i) {
 		return i + 13e-3m;
 	}
@@ -84,6 +90,10 @@ class Cat << Animal {
 		s = 0;
 		s ?= 12;
 		t = nil ?? "herp";
+	}
+
+	DoCall() {
+
 	}
 }
 

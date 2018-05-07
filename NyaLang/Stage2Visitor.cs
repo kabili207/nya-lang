@@ -905,40 +905,155 @@ namespace NyaLang
             // TODO: Account for different parameters
 
             String name = context.identifier().GetText();
-            Type returnType = null;
             Type[] argTypes;
-            Type mathType = typeof(Math);
+            Type retType;
+
+            if(context.NEW() != null)
+            {
+                retType = FindType(name);
+                argTypes = VisitMethodArgs(context);
+
+                ConstructorInfo cinfo = retType.GetConstructor(argTypes);
+                _ilg.Emit(OpCodes.Newobj, cinfo);
+                return retType;
+            }
 
             switch (name)
             {
                 case "sqrt":
                     argTypes = new[] { typeof(double) };
                     VisitAndConvertArgs(context, argTypes);
-                    var miSqrt = mathType.GetMethod("Sqrt", argTypes);
-                    returnType = miSqrt.ReturnType;
-                    _ilg.EmitCall(OpCodes.Call, miSqrt, new Type[] { });
-                    break;
-
+                    return CallMethod(typeof(Math), "Sqrt", argTypes, new Type[] { });
                 case "log":
                     argTypes = new[] { typeof(double) };
                     VisitAndConvertArgs(context, argTypes);
-                    var miLog = mathType.GetMethod("Log10", argTypes);
-                    returnType = miLog.ReturnType;
-                    _ilg.EmitCall(OpCodes.Call, miLog, new Type[] { });
-                    break;
+                    return CallMethod(typeof(Math), "Log10", argTypes, new Type[] { });
                 case "print":
                     argTypes = new[] { typeof(string) };
                     VisitAndConvertArgs(context, argTypes);
-                    var miWrite = typeof(Console).GetMethod("WriteLine", argTypes);
-                    returnType = miWrite.ReturnType;
-                    _ilg.EmitCall(OpCodes.Call, miWrite, new Type[] { });
-                    break;
+                    return CallMethod(typeof(Console), "WriteLine", argTypes, new Type[] { });
             }
-            return returnType;
+
+            Type callingType;
+            bool isThisCall = methodTypeStack.Count == 0;
+
+            if (isThisCall)
+            {
+                callingType = _currTypeBuilder;
+                _ilg.Emit(OpCodes.Ldarg_0);
+            }
+            else
+            {
+                callingType = methodTypeStack.Peek();
+            }
+
+            argTypes = VisitMethodArgs(context);
+            bool wasStatic;
+            retType = CallMethod(callingType, name, argTypes, new Type[] { }, out wasStatic);
+
+            if(wasStatic && isThisCall)
+            {
+                // I hope this works
+                _ilg.Emit(OpCodes.Pop);
+            }
+
+            return retType;
+        }
+
+        Stack<Type> methodTypeStack = new Stack<Type>();
+
+        public override object VisitMemberExp([NotNull] NyaParser.MemberExpContext context)
+        {
+            var obj = context.expression()[0];
+            var member = context.expression()[1];
+
+            object o = Visit(obj);
+            Type objType = o as Type;
+            if (objType == null)
+            {
+                objType = EmitLiteral(o);
+            }
+
+            methodTypeStack.Push(objType);
+            Type retType = (Type)Visit(member);
+            methodTypeStack.Pop();
+
+            return retType;
+        }
+
+        private Type CallMethod(Type t, string name, Type[] argTypes, Type[] typeParams)
+        {
+            bool isStatic;
+            return CallMethod(t, name, argTypes, typeParams, out isStatic);
+        }
+
+        private MethodInfo FindMethod(Type t, string name, Type[] argTypes)
+        {
+            TypeBuilder builder = t as TypeBuilder;
+            try
+            {
+                return t.GetMethod(name, argTypes);
+            }
+            catch (NotSupportedException)
+            {
+                // TODO: Make this actually work
+
+                // Looks like we're doing this the hard way...
+                foreach (var method in builder.DeclaredMethods)
+                {
+                    if (method.Name == name)
+                    {
+                        bool isMatch = true;
+                        var pinfos = method.GetParameters();
+                        if (pinfos.Length == argTypes.Length)
+                        {
+                            for (int i = 0; i < pinfos.Length; i++)
+                            {
+                                if (argTypes[i] != pinfos[i].ParameterType)
+                                {
+                                    isMatch = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (isMatch)
+                            return method;
+                    }
+                }
+            }
+            return null;
+        }
+
+        private Type CallMethod(Type t, string name, Type[] argTypes, Type[] typeParams, out bool wasStatic)
+        {
+            // TODO: Account for virt methods
+            var method = FindMethod(t, name, argTypes);
+            OpCode op = method.IsStatic ? OpCodes.Call : OpCodes.Callvirt;
+            _ilg.EmitCall(op, method, typeParams);
+            wasStatic = method.IsStatic;
+            return method.ReturnType;
+        }
+
+        private Type[] VisitMethodArgs(NyaParser.FunctionExpContext context)
+        {
+            if (context.arguments() == null)
+                return new Type[] { };
+
+            var args = context.arguments().children.OfType<NyaParser.ArgumentContext>().ToList();
+            Type[] argTypes = new Type[args.Count];
+
+            for (int i = 0; i < args.Count; i++)
+            {
+                argTypes[i] = (Type)Visit(args[i]);
+            }
+            return argTypes;
         }
 
         private void VisitAndConvertArgs(NyaParser.FunctionExpContext context, Type[] argTypes)
         {
+            if (context.arguments() == null)
+                return;
+
             var args = context.arguments().children.OfType<NyaParser.ArgumentContext>().ToList();
             for (int i = 0; i < args.Count; i++)
             {

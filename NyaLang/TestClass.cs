@@ -46,8 +46,14 @@ namespace NyaLang.Test
             Regex regex = new Regex("a[^6q]cf?", RegexOptions.IgnoreCase | RegexOptions.Multiline);
             return 10;
         }
-    }
 
+        void TestNew()
+        {
+            var c = new Cat();
+            c.ConvertDec(12);
+        }
+
+    }
 
     public class Cat : Animal
     {
@@ -79,7 +85,7 @@ namespace NyaLang.Test
             var b = Math.Log10(10 + a * 35 + (7.4f));
         }
 
-        decimal ConvertDec(int i)
+        public decimal ConvertDec(int i)
         {
             return i + 13e-3m;
         }
@@ -96,6 +102,11 @@ namespace NyaLang.Test
             //var s = 0;
             //var s ?= 12;
             var t = null ?? "herp";
+        }
+
+        void DoCall()
+        {
+            ConvertDec(12);
         }
     }
 
