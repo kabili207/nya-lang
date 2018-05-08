@@ -52,11 +52,11 @@ interface_member_declaration
 	;
 
 method_declaration
-	: attributes? type_descriptor? identifier Exclamation? RoundLeft fixed_parameters? RoundRight block
+	: attributes? type_descriptor? identifier (IsStatic='!')? RoundLeft fixed_parameters? RoundRight block
 	;
 
 interface_method_declaration
-	: attributes? type_descriptor? identifier Exclamation? RoundLeft fixed_parameters? RoundRight ';'
+	: attributes? type_descriptor? identifier RoundLeft fixed_parameters? RoundRight ';'
 	;
 
 attributes
@@ -64,7 +64,7 @@ attributes
 	;
 
 attribute
-	: At (attribute_target ':')? identifier (RoundLeft attribute_arguments? RoundRight)?
+	: '@' (attribute_target ':')? identifier (RoundLeft attribute_arguments? RoundRight)?
 	;
 
 global_attribute
@@ -92,7 +92,7 @@ fixed_parameters
 	;
 
 fixed_parameter
-	: type_descriptor identifier (Question | Equal literal)?
+	: type_descriptor identifier (Question | Equal='=' literal)?
 	;
 
 type_descriptor
@@ -175,21 +175,19 @@ string_literal
 	;
 
 expression
-	: RoundLeft type RoundRight expression           #castExp
-	| RoundLeft expression RoundRight                #parenthesisExp
-    | expression (Asterisk|Slash|Percent) expression #mulDivExp
-    | expression (Plus|Minus) expression             #addSubExp
-    | expression (AngleLeft AngleLeft|AngleRight AngleRight) expression #bitShiftExp
-    | expression Ampersand expression                #bitwiseAndExp
-    | expression Hat expression                      #bitwiseXorExp
-    | expression Pipe expression                     #bitwiseOrExp
-    | expression Ampersand Ampersand expression      #logicalAndExp
-    | expression Pipe Pipe expression                #logicalOrExp
-	| expression '??' expression                     #coalesceExp
-    | NEW? identifier RoundLeft arguments? RoundRight     #functionExp
-	| literal                                        #literalExp
-	| expression '.' expression                      #memberExp
-    | identifier                                     #nameAtomExp
+	: RoundLeft type RoundRight expression                   #castExp
+	| RoundLeft expression RoundRight                        #parenthesisExp
+    | expression (OpMuliply|OpDivision|OpModulus) expression #mulDivExp
+    | expression (OpAddition|OpSubtraction) expression       #addSubExp
+    | expression (OpLeftShift|OpRightShift) expression       #bitShiftExp
+    | expression (OpBitwiseAnd|OpBitwiseOr|OpXor) expression #bitwiseExp
+    | expression (OpAnd|OpOr) expression                     #logicalExp
+	| expression '??' expression                             #coalesceExp
+	| expression '?' expression ':' expression               #ternaryExp
+    | NEW? identifier RoundLeft arguments? RoundRight        #functionExp
+	| literal                                                #literalExp
+	| expression '.' expression                              #memberExp
+    | identifier                                             #nameAtomExp
     ;
 
 identifier
@@ -228,28 +226,36 @@ REGULAR_STRING:                      '"'  (~["\\\r\n\u0085\u2028\u2029] | Common
 VERBATIUM_STRING:                    '@"' (~'"' | '""')* '"';
 
 
-Equal               : '=' ;
-Asterisk            : '*' ;
-Slash               : '/' ;
-Plus                : '+' ;
-Minus               : '-' ;
-Hat                 : '^' ;
-Pipe                : '|' ;
-Ampersand           : '&' ;
-Percent             : '%' ;
-Exclamation         : '!' ;
+OpAddition          : '+' ;
+OpSubtraction       : '-' ;
+OpMuliply           : '*' ;
+OpDivision          : '/' ;
+OpModulus           : '%' ;
+OpAnd               : '&&' ;
+OpOr                : '||' ;
+OpBitwiseAnd        : '&' ;
+OpBitwiseOr         : '|' ;
+OpXor               : '^' ;
+OpNot               : '!' ;
+OpOnesComplement    : '~' ;
+OpIncrement         : '++' ;
+OpDecrement         : '--' ;
+
+OpEqual             : '=' ;
+OpLessThan          : '<' ;
+OpGreaterThan       : '>' ;
+OpLeftShift         : '<<' ;
+OpRightShift        : '>>' ;
+
 Question            : '?' ;
 At                  : '@' ;
 Dollar              : '$' ;
 Colon               : ':' ;
 SemiColon           : ';' ;
 Dot                 : '.' ;
-Tilde               : '~' ;
 Underscore          : '_' ;
 RoundLeft           : '(' ;
 RoundRight          : ')' ;
-AngleLeft           : '<' ;
-AngleRight          : '>' ;
 SquareLeft          : '[' ;
 SquareRight         : ']' ;
 CurlyLeft           : '{' ;

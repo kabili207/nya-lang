@@ -162,7 +162,7 @@ namespace NyaLang
 
             string methodName = context.identifier().GetText();
             bool bIsEntry = false;
-            bool isStatic = context.Exclamation() != null;
+            bool isStatic = context.IsStatic != null;
             bool isConstructor = methodName == "New";
 
             _scopeManager.Push(ScopeLevel.Method);
@@ -894,13 +894,13 @@ namespace NyaLang
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
-            if (context.Asterisk() != null)
+            if (context.OpMuliply() != null)
                 OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Mul, "op_Multiply");
 
-            if (context.Slash() != null)
+            if (context.OpDivision() != null)
                 OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Div, "op_Division");
 
-            if (context.Percent() != null)
+            if (context.OpModulus() != null)
                 OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Rem, "op_Modulus");
 
             _stackDepth--;
@@ -913,10 +913,10 @@ namespace NyaLang
             Type tRight = (Type)Visit(context.expression(1));
 
 
-            if (context.Plus() != null)
+            if (context.OpAddition() != null)
                 OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Add, "op_Addition");
 
-            if (context.Minus() != null)
+            if (context.OpSubtraction() != null)
                 OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Sub, "op_Subtraction");
 
             _stackDepth--;
