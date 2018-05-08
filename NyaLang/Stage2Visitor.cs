@@ -923,6 +923,41 @@ namespace NyaLang
             return tLeft;
         }
 
+        public override object VisitBitShiftExp([NotNull] NyaParser.BitShiftExpContext context)
+        {
+            Type tLeft = (Type)Visit(context.expression(0));
+            Type tRight = (Type)Visit(context.expression(1));
+
+
+            if (context.OpLeftShift() != null)
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Shl, "op_LeftShift");
+
+            if (context.OpRightShift() != null)
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Shr, "op_RightShift");
+
+            _stackDepth--;
+            return tLeft;
+        }
+
+        public override object VisitBitwiseExp([NotNull] NyaParser.BitwiseExpContext context)
+        {
+            Type tLeft = (Type)Visit(context.expression(0));
+            Type tRight = (Type)Visit(context.expression(1));
+
+
+            if (context.OpBitwiseAnd() != null)
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.And, "op_BitwiseAnd");
+
+            if (context.OpBitwiseOr() != null)
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Or, "op_BitwiseOr");
+
+            if (context.OpXor() != null)
+                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Xor, "op_ExclusiveOr");
+
+            _stackDepth--;
+            return tLeft;
+        }
+
         public override object VisitFunctionExp([NotNull] NyaParser.FunctionExpContext context)
         {
             // TODO: Account for different parameters
