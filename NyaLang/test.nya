@@ -1,10 +1,14 @@
 ﻿
-@@AssemblyTitle("NyaTest")
-@@AssemblyProduct("NyaTest")
-@@AssemblyDescription("Test output for the Nya compiler")
-@@AssemblyCopyright("Copyright © Amy Nagle 2018")
-@@AssemblyCompany("Muffin Tech")
-@@AssemblyInformationalVersion("0.2b")
+info {
+	Title = "NyaTest";
+	Product = "NyaTest";
+	Description = "Test output for the Nya compiler";
+	Copyright = "Copyright © Amy Nagle 2018";
+	Company = "Muffin Tech";
+	Version = "0.2.0.0";
+	FileVersion = "0.2.0.2";
+	InformationalVersion = "0.2b";
+}
 
 @public
 interface Dog {

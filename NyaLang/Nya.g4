@@ -13,6 +13,19 @@ unit_declaration
 	: type_delcaration
 	| method_declaration
 	| global_attribute
+	| build_info
+	;
+
+build_info
+	: 'info' CurlyLeft build_info_declarations? CurlyRight
+	;
+
+build_info_declarations
+	: build_info_declaration+
+	;
+
+build_info_declaration
+	: identifier '=' literal SemiColon
 	;
 
 type_delcaration

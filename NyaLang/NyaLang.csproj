@@ -49,6 +49,8 @@
   <ItemGroup>
     <Compile Include="AssemblyDetail.cs" />
     <Compile Include="ClassDescriptor.cs" />
+    <Compile Include="LiteralHelper.cs" />
+    <Compile Include="Stage0Visitor.cs" />
     <Compile Include="TopoSort\Extensions.cs" />
     <Compile Include="TopoSort\GenericEqualityComparer.cs" />
     <Compile Include="OpHelper.cs" />

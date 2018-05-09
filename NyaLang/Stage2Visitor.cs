@@ -221,7 +221,7 @@ namespace NyaLang
                     if ((methAttrs & MethodAttributes.Virtual) != MethodAttributes.Virtual)
                         methAttrs |= MethodAttributes.Final;
                     methAttrs |= MethodAttributes.Virtual;
-                    if (!baseMethod.DeclaringType.IsInterface)
+                    if (baseMethod.DeclaringType.IsInterface)
                         methAttrs |= MethodAttributes.NewSlot;
 
                     if ((methAttrs & MethodAttributes.Public) != MethodAttributes.Public)
@@ -469,258 +469,37 @@ namespace NyaLang
         private Type EmitLiteral(object o)
         {
             _stackDepth++;
-            if (o == null)
-            {
-                _ilg.Emit(OpCodes.Ldnull);
-                return null;
-            }
-
-            if (o is bool)
-                EmitBool((bool)o);
-            else if (o is string)
-                EmitString((string)o);
-            else if (o is float)
-                EmitFloat((float)o);
-            else if (o is double)
-                EmitDouble((double)o);
-            else if (o is decimal)
-                EmitDecimal((decimal)o);
-            else if (o is int)
-                EmitInt((int)o);
-            else if (o is short)
-                EmitInt((short)o);
-            else if (o is long)
-                EmitInt((long)o);
-            else if (o is byte)
-                EmitInt((byte)o);
-            else if (o is sbyte)
-                EmitInt((sbyte)o);
-            else if (o is ushort)
-                EmitInt((ushort)o);
-            else if (o is uint)
-                EmitInt((uint)o);
-            else if (o is ulong)
-                EmitInt((ulong)o);
-            else if (o is Regex)
-                EmitRegex((Regex)o);
-
-            return o.GetType();
+            return LiteralHelper.EmitLiteral(_ilg, o);
         }
 
         public override object VisitNullLiteral([NotNull] NyaParser.NullLiteralContext context)
         {
-            return null;
-        }
-
-        private void EmitBool(bool b)
-        {
-            if (b)
-            {
-                _ilg.Emit(OpCodes.Ldc_I4_1);
-            }
-            else
-            {
-                _ilg.Emit(OpCodes.Ldc_I4_0);
-            }
+            return LiteralHelper.VisitLiteral(context);
         }
 
         public override object VisitBoolLiteral([NotNull] NyaParser.BoolLiteralContext context)
         {
-            string boolText = context.GetText();
-
-            return boolText == "true";
-        }
-
-        private void EmitString(string s)
-        {
-            _ilg.Emit(OpCodes.Ldstr, s);
+            return LiteralHelper.VisitLiteral(context);
         }
 
         public override object VisitStringLiteral([NotNull] NyaParser.StringLiteralContext context)
         {
-            string rawString = context.GetText();
-            rawString = rawString.Substring(1, rawString.Length - 2);
-            string unescaped = StringHelper.StringFromCSharpLiteral(rawString);
-            return unescaped;
-        }
-
-        private void EmitFloat(float f)
-        {
-            _ilg.Emit(OpCodes.Ldc_R4, f);
-        }
-
-        private void EmitDouble(double d)
-        {
-            _ilg.Emit(OpCodes.Ldc_R8, d);
-        }
-
-        private void EmitDecimal(decimal d)
-        {
-            ConstructorInfo ctor1 = typeof(Decimal).GetConstructor(
-                new Type[] {
-                            typeof(Int32),
-                            typeof(Int32),
-                            typeof(Int32),
-                            typeof(Boolean),
-                            typeof(Byte)
-                }
-            );
-
-            int[] parts = Decimal.GetBits(d);
-            bool sign = (parts[3] & 0x80000000) != 0;
-
-            byte scale = (byte)((parts[3] >> 16) & 0x7F);
-
-            _ilg.Emit(OpCodes.Nop);
-            _ilg.Emit(OpCodes.Ldc_I4, parts[0]);
-            _ilg.Emit(OpCodes.Ldc_I4, parts[1]);
-            _ilg.Emit(OpCodes.Ldc_I4, parts[2]);
-            _ilg.Emit(OpCodes.Ldc_I4, sign ? 1 : 0);
-            _ilg.Emit(OpCodes.Ldc_I4, (int)scale);
-            _ilg.Emit(OpCodes.Newobj, ctor1);
+            return LiteralHelper.VisitLiteral(context);
         }
 
         public override object VisitRealLiteral([NotNull] NyaParser.RealLiteralContext context)
         {
-            string value = context.GetText().ToLower();
-            string suffix = "";
-            if (new[] { 'f', 'd', 'm' }.Contains(value[value.Length - 1]))
-            {
-                suffix = value[value.Length - 1].ToString();
-                value = value.Substring(0, value.Length - 1);
-            }
-
-            switch (suffix)
-            {
-                case "m":
-                    return decimal.Parse(value, value.Contains("e") ?
-                        System.Globalization.NumberStyles.Float : System.Globalization.NumberStyles.Number);
-                case "d":
-                    return double.Parse(value);
-                case "f":
-                default:
-                    return float.Parse(value);
-            }
-        }
-
-        private void EmitInt(byte b)
-        {
-            _ilg.Emit(OpCodes.Ldc_I4, b);
-        }
-
-        private void EmitInt(short s)
-        {
-            _ilg.Emit(OpCodes.Ldc_I4, s);
-        }
-
-        private void EmitInt(int i)
-        {
-            _ilg.Emit(OpCodes.Ldc_I4, i);
-        }
-
-        private void EmitInt(long l)
-        {
-            _ilg.Emit(OpCodes.Ldc_I8, l);
-        }
-
-        private void EmitInt(sbyte b)
-        {
-            _ilg.Emit(OpCodes.Ldc_I4, b);
-        }
-
-        private void EmitInt(ushort s)
-        {
-            _ilg.Emit(OpCodes.Ldc_I4, s);
-        }
-
-        private void EmitInt(uint s)
-        {
-            _ilg.Emit(OpCodes.Ldc_I4, s);
-        }
-
-        private void EmitInt(ulong s)
-        {
-            _ilg.Emit(OpCodes.Ldc_I8, (long)s);
+            return LiteralHelper.VisitLiteral(context);
         }
 
         public override object VisitIntegerLiteral([NotNull] NyaParser.IntegerLiteralContext context)
         {
-            string text = context.GetText();
-            var regex = Regex.Match(text, @"(\d+)(\w+)?");
-            string value = regex.Groups[1].Value;
-            string suffix = regex.Groups[2].Value.ToLower();
-
-            switch (suffix)
-            {
-                case "b":
-                    return byte.Parse(value);
-                case "s":
-                    return short.Parse(value);
-                case "l":
-                    return long.Parse(value);
-                case "u":
-                    return uint.Parse(value);
-                case "lu":
-                case "ul":
-                    return ulong.Parse(value);
-                case "su":
-                case "us":
-                    return ushort.Parse(value);
-                case "sb":
-                case "bs":
-                    return sbyte.Parse(value);
-                default:
-                    return int.Parse(value);
-            }
-        }
-
-        private void EmitRegex(Regex r)
-        {
-            ConstructorInfo ctor1 = typeof(Regex).GetConstructor(
-                new Type[] {
-                    typeof(String),
-                    typeof(RegexOptions)
-                }
-            );
-
-            _ilg.Emit(OpCodes.Nop);
-            _ilg.Emit(OpCodes.Ldstr, r.ToString());
-            _ilg.Emit(OpCodes.Ldc_I4, (int)r.Options);
-            _ilg.Emit(OpCodes.Newobj, ctor1);
+            return LiteralHelper.VisitLiteral(context);
         }
 
         public override object VisitRegexLiteral([NotNull] NyaParser.RegexLiteralContext context)
         {
-            string raw = context.GetText();
-            int start = raw.IndexOf('/');
-            int end = raw.LastIndexOf('/');
-            string regex = raw.Substring(start+1, end - 1);
-            string flags = raw.Substring(end + 1);
-
-            RegexOptions options = RegexOptions.None;
-            foreach(var flag in flags)
-            {
-                switch (flag)
-                {
-                    case 'm':
-                        options |= RegexOptions.Multiline;
-                        break;
-                    case 'i':
-                        options |= RegexOptions.IgnoreCase;
-                        break;
-                    case 's':
-                        options |= RegexOptions.Singleline;
-                        break;
-                    case 'x':
-                        options |= RegexOptions.IgnorePatternWhitespace;
-                        break;
-                    case 'n':
-                        options |= RegexOptions.ExplicitCapture;
-                        break;
-                }
-            }
-
-            return new Regex(regex, options);
+            return LiteralHelper.VisitLiteral(context);
         }
 
         public override object VisitReturnStatement([NotNull] NyaParser.ReturnStatementContext context)
