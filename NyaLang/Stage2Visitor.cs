@@ -22,6 +22,13 @@ namespace NyaLang
         Label returnLabel;
         int _stackDepth = 0;
 
+        string[] _currentUsing = new[]
+        {
+            "System",
+            "System.Collections.Generic",
+            "System.Linq"
+        };
+
 
         ScopeManager _scopeManager = new ScopeManager();
 
@@ -104,7 +111,7 @@ namespace NyaLang
         private Type FindType(string name, string[] namespaces = null)
         {
             if (namespaces == null)
-                namespaces = new string[] { };
+                namespaces = _currentUsing ?? new string[] { };
             Type t = _asmBuilder.GetType(name) ?? Type.GetType(name);
 
             if (t == null)
@@ -434,13 +441,32 @@ namespace NyaLang
             if (context != null)
             {
                 string typeName = context.identifier().GetText();
+                var typeArgs = new Type[] { };
+
+                if (context.type_argument_list() != null)
+                {
+                    typeArgs = context.type_argument_list().children.OfType<NyaParser.TypeContext>().Select(x => ParseType(x)).ToArray();
+                }
+
                 if (typeAliases.ContainsKey(typeName))
                 {
                     t = typeAliases[typeName];
-                    if (context.array_type() != null)
-                    {
-                        t = t.MakeArrayType();
-                    }
+                }
+                else
+                {
+                    if (typeArgs.Length > 0)
+                        typeName += "`" + typeArgs.Length;
+                    t = FindType(typeName, _currentUsing);
+                }
+
+                if( context.type_argument_list() != null)
+                {
+                    t = t.MakeGenericType(typeArgs);
+                }
+
+                if (context.array_type() != null)
+                {
+                    t = t.MakeArrayType();
                 }
             }
             return t;
@@ -751,6 +777,31 @@ namespace NyaLang
             return tLeft;
         }
 
+        public override object VisitAsExp([NotNull] NyaParser.AsExpContext context)
+        {
+            Type src = (Type)Visit(context.expression());
+            Type dst = ParseType(context.type());
+
+            _ilg.Emit(OpCodes.Isinst, dst);
+
+            return dst;
+        }
+
+        public override object VisitNewExp([NotNull] NyaParser.NewExpContext context)
+        {
+            Type[] argTypes;
+            Type retType;
+
+            retType = ParseType(context.type());
+            argTypes = VisitMethodArgs(context.arguments());
+
+            ConstructorInfo cinfo = retType.GetConstructor(argTypes);
+            _ilg.Emit(OpCodes.Newobj, cinfo);
+            _stackDepth++;
+            return retType;
+
+        }
+
         public override object VisitFunctionExp([NotNull] NyaParser.FunctionExpContext context)
         {
             // TODO: Account for different parameters
@@ -758,17 +809,6 @@ namespace NyaLang
             String name = context.identifier().GetText();
             Type[] argTypes;
             Type retType;
-
-            if(context.NEW() != null)
-            {
-                retType = FindType(name);
-                argTypes = VisitMethodArgs(context);
-
-                ConstructorInfo cinfo = retType.GetConstructor(argTypes);
-                _ilg.Emit(OpCodes.Newobj, cinfo);
-                _stackDepth++;
-                return retType;
-            }
 
             switch (name)
             {
@@ -800,7 +840,7 @@ namespace NyaLang
                 callingType = methodTypeStack.Peek();
             }
 
-            argTypes = VisitMethodArgs(context);
+            argTypes = VisitMethodArgs(context.arguments());
             bool wasStatic;
             retType = CallMethod(callingType, name, argTypes, new Type[] { }, out wasStatic);
 
@@ -891,12 +931,12 @@ namespace NyaLang
             return method.ReturnType;
         }
 
-        private Type[] VisitMethodArgs(NyaParser.FunctionExpContext context)
+        private Type[] VisitMethodArgs(NyaParser.ArgumentsContext context)
         {
-            if (context.arguments() == null)
+            if (context == null)
                 return new Type[] { };
 
-            var args = context.arguments().children.OfType<NyaParser.ArgumentContext>().ToList();
+            var args = context.children.OfType<NyaParser.ArgumentContext>().ToList();
             Type[] argTypes = new Type[args.Count];
 
             for (int i = 0; i < args.Count; i++)

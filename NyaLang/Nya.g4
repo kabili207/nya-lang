@@ -117,7 +117,7 @@ types
 	;
 
 type
-	: identifier array_type?
+	: identifier (type_argument_list | nullable='?')? array_type?
 	;
 
 
@@ -201,7 +201,8 @@ expression
 	| expression 'as' type                                   #asExp
 	| expression '??' expression                             #coalesceExp
 	| expression '?' expression ':' expression               #ternaryExp
-    | NEW? identifier RoundLeft arguments? RoundRight        #functionExp
+    | NEW type RoundLeft arguments? RoundRight               #newExp
+    | identifier RoundLeft arguments? RoundRight             #functionExp
 	| literal                                                #literalExp
 	| expression '.' expression                              #memberExp
     | identifier                                             #nameAtomExp
