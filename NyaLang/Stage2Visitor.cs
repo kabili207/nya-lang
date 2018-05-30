@@ -718,20 +718,34 @@ namespace NyaLang
             return tLeft;
         }
 
-        public override object VisitBitwiseExp([NotNull] NyaParser.BitwiseExpContext context)
+        public override object VisitBitwiseAndExp([NotNull] NyaParser.BitwiseAndExpContext context)
         {
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
+            OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.And, "op_BitwiseAnd");
 
-            if (context.OpBitwiseAnd() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.And, "op_BitwiseAnd");
+            _stackDepth--;
+            return tLeft;
+        }
 
-            if (context.OpBitwiseOr() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Or, "op_BitwiseOr");
+        public override object VisitBitwiseXorExp([NotNull] NyaParser.BitwiseXorExpContext context)
+        {
+            Type tLeft = (Type)Visit(context.expression(0));
+            Type tRight = (Type)Visit(context.expression(1));
 
-            if (context.OpXor() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Xor, "op_ExclusiveOr");
+            OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Xor, "op_ExclusiveOr");
+
+            _stackDepth--;
+            return tLeft;
+        }
+
+        public override object VisitBitwiseOrExp([NotNull] NyaParser.BitwiseOrExpContext context)
+        {
+            Type tLeft = (Type)Visit(context.expression(0));
+            Type tRight = (Type)Visit(context.expression(1));
+
+            OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Or, "op_BitwiseOr");
 
             _stackDepth--;
             return tLeft;

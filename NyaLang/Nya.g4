@@ -193,8 +193,12 @@ expression
     | expression (OpMuliply|OpDivision|OpModulus) expression #mulDivExp
     | expression (OpAddition|OpSubtraction) expression       #addSubExp
     | expression (OpLeftShift|OpRightShift) expression       #bitShiftExp
-    | expression (OpBitwiseAnd|OpBitwiseOr|OpXor) expression #bitwiseExp
-    | expression (OpAnd|OpOr) expression                     #logicalExp
+    | expression OpBitwiseAnd expression                     #bitwiseAndExp
+    | expression OpXor expression                            #bitwiseXorExp
+    | expression OpBitwiseOr expression                      #bitwiseOrExp
+    | expression OpAnd expression                            #conditionalAndExp
+    | expression OpOr expression                             #conditionalOrExp
+	| expression 'as' type                                   #asExp
 	| expression '??' expression                             #coalesceExp
 	| expression '?' expression ':' expression               #ternaryExp
     | NEW? identifier RoundLeft arguments? RoundRight        #functionExp
