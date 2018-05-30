@@ -100,6 +100,8 @@ class Cat << Animal {
 		q = new Dictionary<string, int>();
 	}
 
+	byte TestByte() {
+		return 4b;
 	}
 }
 

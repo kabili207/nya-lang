@@ -150,7 +150,7 @@ namespace NyaLang
 
         private static void EmitInt(ILGenerator _ilg, byte b)
         {
-            _ilg.Emit(OpCodes.Ldc_I4, b);
+            _ilg.Emit(OpCodes.Ldc_I4_S, b);
         }
 
         private static void EmitInt(ILGenerator _ilg, short s)
@@ -170,7 +170,7 @@ namespace NyaLang
 
         private static void EmitInt(ILGenerator _ilg, sbyte b)
         {
-            _ilg.Emit(OpCodes.Ldc_I4, b);
+            _ilg.Emit(OpCodes.Ldc_I4_S, b);
         }
 
         private static void EmitInt(ILGenerator _ilg, ushort s)

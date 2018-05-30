@@ -274,11 +274,7 @@ namespace NyaLang
 
                         if (o != null)
                         {
-                            pb.SetCustomAttribute(
-                                new CustomAttributeBuilder(
-                                    typeof(DefaultParameterValueAttribute).GetConstructor(new Type[] { typeof(Object) }),
-                                    new object[] { o })
-                            );
+                            pb.SetConstant(o);
                         }
                     }
                 }
@@ -420,11 +416,7 @@ namespace NyaLang
 
                         if (o != null)
                         {
-                            pb.SetCustomAttribute(
-                                new CustomAttributeBuilder(
-                                    typeof(DefaultParameterValueAttribute).GetConstructor(new Type[] { typeof(Object) }),
-                                    new object[] { o })
-                            );
+                            pb.SetConstant(o);
                         }
                     }
                 }
