@@ -556,7 +556,6 @@ namespace NyaLang
             {
                 callingType = _currTypeBuilder;
                 _ilg.Emit(OpCodes.Ldarg_0);
-                _stackDepth++;
             }
             else
             {
@@ -571,7 +570,6 @@ namespace NyaLang
             {
                 // I hope this works
                 _ilg.Emit(OpCodes.Pop);
-                _stackDepth--;
             }
 
             return retType;
@@ -602,43 +600,6 @@ namespace NyaLang
         {
             bool isStatic;
             return CallMethod(t, name, argTypes, typeParams, out isStatic);
-        }
-
-        private MethodInfo FindMethod(Type t, string name, Type[] argTypes)
-        {
-            TypeBuilder builder = t as TypeBuilder;
-            try
-            {
-                return t.GetMethod(name, argTypes);
-            }
-            catch (NotSupportedException)
-            {
-                // TODO: Make this actually work
-
-                // Looks like we're doing this the hard way...
-                foreach (var method in builder.DeclaredMethods)
-                {
-                    if (method.Name == name)
-                    {
-                        bool isMatch = true;
-                        var pinfos = method.GetParameters();
-                        if (pinfos.Length == argTypes.Length)
-                        {
-                            for (int i = 0; i < pinfos.Length; i++)
-                            {
-                                if (argTypes[i] != pinfos[i].ParameterType)
-                                {
-                                    isMatch = false;
-                                    break;
-                                }
-                            }
-                        }
-                        if (isMatch)
-                            return method;
-                    }
-                }
-            }
-            return null;
         }
 
         private Type CallMethod(Type t, string name, Type[] argTypes, Type[] typeParams, out bool wasStatic)

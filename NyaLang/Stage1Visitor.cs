@@ -418,55 +418,5 @@ namespace NyaLang
 
             meth.Builder = methodBuilder;
         }
-
-        private MethodInfo FindParentDefinition(Type t, string name, Type[] methodArgs)
-        {
-            if (t == null)
-                return null;
-            MethodInfo info = null;
-            if (t.BaseType != null)
-            {
-                try
-                {
-                    info = t.BaseType.GetMethod(name, methodArgs);
-                }
-                catch
-                {
-                    var baseDesc = ClassDescriptors.FirstOrDefault(x => x.Builder.FullName == t.BaseType.FullName);
-                    var methDesc = baseDesc.Methods.FirstOrDefault(x => x.Builder.Name == name && Enumerable.SequenceEqual(x.ParameterTypes, methodArgs));
-                    info = methDesc?.Builder;
-                }
-                if (info != null)
-                    return info;
-                info = FindParentDefinition(t.BaseType, name, methodArgs);
-            }
-            else
-            {
-                info = typeof(object).GetMethod(name, methodArgs);
-            }
-            if (info != null)
-                return info;
-
-            foreach (var iface in t.GetInterfaces())
-            {
-                try
-                {
-                    info = iface.GetMethod(name, methodArgs);
-                }
-                catch
-                {
-                    var baseDesc = ClassDescriptors.FirstOrDefault(x => x.Builder.FullName == iface.FullName);
-                    var methDesc = baseDesc.Methods.FirstOrDefault(x => x.Builder.Name == name && Enumerable.SequenceEqual(x.ParameterTypes, methodArgs));
-                    info = methDesc?.Builder;
-                }
-
-                if (info != null)
-                    return info;
-                info = FindParentDefinition(iface, name, methodArgs);
-                if (info != null)
-                    return info;
-            }
-            return null;
-        }
     }
 }

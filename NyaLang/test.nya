@@ -98,6 +98,7 @@ class Cat << Animal {
 
 	DoCall() {
 		q = new Dictionary<string, int>();
+		TestByte();
 	}
 
 	byte TestByte() {

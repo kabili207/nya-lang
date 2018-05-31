@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
@@ -90,5 +91,79 @@ namespace NyaLang
             return typeof(void);
         }
 
+        protected MethodInfo FindMethod(Type t, string name, Type[] methodArgs)
+        {
+            MethodInfo info = null;
+            try
+            {
+                info = t.GetMethod(name, methodArgs);
+            }
+            catch
+            {
+                var baseDesc = ClassDescriptors.FirstOrDefault(x => x.Builder.FullName == t.FullName);
+                var methDesc = baseDesc.Methods.FirstOrDefault(x => x.Builder.Name == name && Enumerable.SequenceEqual(x.ParameterTypes, methodArgs));
+                info = methDesc?.Builder;
+            }
+            if (info != null)
+                return info;
+
+            if (t.BaseType != null)
+                info = FindMethod(t.BaseType, name, methodArgs);
+
+            if (info != null)
+                return info;
+
+            return typeof(object).GetMethod(name, methodArgs);
+        }
+
+        protected MethodInfo FindParentDefinition(Type t, string name, Type[] methodArgs)
+        {
+            if (t == null)
+                return null;
+            MethodInfo info = null;
+            if (t.BaseType != null)
+            {
+                try
+                {
+                    info = t.BaseType.GetMethod(name, methodArgs);
+                }
+                catch
+                {
+                    var baseDesc = ClassDescriptors.FirstOrDefault(x => x.Builder.FullName == t.BaseType.FullName);
+                    var methDesc = baseDesc.Methods.FirstOrDefault(x => x.Builder.Name == name && Enumerable.SequenceEqual(x.ParameterTypes, methodArgs));
+                    info = methDesc?.Builder;
+                }
+                if (info != null)
+                    return info;
+                info = FindParentDefinition(t.BaseType, name, methodArgs);
+            }
+            else
+            {
+                info = typeof(object).GetMethod(name, methodArgs);
+            }
+            if (info != null)
+                return info;
+
+            foreach (var iface in t.GetInterfaces())
+            {
+                try
+                {
+                    info = iface.GetMethod(name, methodArgs);
+                }
+                catch
+                {
+                    var baseDesc = ClassDescriptors.FirstOrDefault(x => x.Builder.FullName == iface.FullName);
+                    var methDesc = baseDesc.Methods.FirstOrDefault(x => x.Builder.Name == name && Enumerable.SequenceEqual(x.ParameterTypes, methodArgs));
+                    info = methDesc?.Builder;
+                }
+
+                if (info != null)
+                    return info;
+                info = FindParentDefinition(iface, name, methodArgs);
+                if (info != null)
+                    return info;
+            }
+            return null;
+        }
     }
 }

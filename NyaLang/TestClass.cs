@@ -106,7 +106,13 @@ namespace NyaLang.Test
 
         void DoCall()
         {
-            ConvertDec(12);
+            var q = new Dictionary<string, int>();
+            TestByte();
+        }
+
+        byte TestByte()
+        {
+            return 4;
         }
     }
 
