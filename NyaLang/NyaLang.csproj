@@ -50,10 +50,12 @@
     <Compile Include="AssemblyDetail.cs" />
     <Compile Include="ClassDescriptor.cs" />
     <Compile Include="LiteralHelper.cs" />
+    <Compile Include="MethodDescriptor.cs" />
     <Compile Include="Stage0Visitor.cs" />
+    <Compile Include="StagedVisitor.cs" />
     <Compile Include="TopoSort\Extensions.cs" />
     <Compile Include="TopoSort\GenericEqualityComparer.cs" />
-    <Compile Include="OpHelper.cs" />
+    <Compile Include="TypeHelper.cs" />
     <Compile Include="Stage1Visitor.cs" />
     <Compile Include="Stage2Visitor.cs" />
     <Compile Include="Program.cs" />

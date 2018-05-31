@@ -13,7 +13,7 @@ using NyaLang.Antlr;
 
 namespace NyaLang
 {
-    public class Stage2Visitor : NyaBaseVisitor<object>
+    public class Stage2Visitor : StagedVisitor
     {
         const string NullKeyword = "nil";
 
@@ -22,39 +22,16 @@ namespace NyaLang
         Label returnLabel;
         int _stackDepth = 0;
 
-        string[] _currentUsing = new[]
-        {
-            "System",
-            "System.Collections.Generic",
-            "System.Linq"
-        };
-
-
         ScopeManager _scopeManager = new ScopeManager();
 
-        public AssemblyBuilder _asmBuilder;
-        private IEnumerable<ClassDescriptor> _classDescriptors;
-        private ModuleBuilder _moduleBuilder;
         private string _outPath;
 
-        private Dictionary<string, Type> typeAliases = new Dictionary<string, Type>()
+        public Stage2Visitor(AssemblyBuilder asmBuilder, ModuleBuilder modBuilder, IList<ClassDescriptor> descriptors, IList<MethodDescriptor> globals)
         {
-            { "string", typeof(String) }, { "bool", typeof(Boolean) }, { "float", typeof(Single) }, { "double", typeof(Double) },
-            { "sbyte", typeof(SByte) }, { "short", typeof(Int16) }, { "int", typeof(Int32) }, { "long", typeof(Int64) },
-            { "byte", typeof(Byte) }, { "ushort", typeof(UInt16) }, { "uint", typeof(UInt32) }, { "ulong", typeof(UInt64) },
-            { "decimal", typeof(decimal) }, { "object", typeof(object) }
-        };
-
-        public Stage2Visitor(AssemblyBuilder asmBuilder, ModuleBuilder modBuilder, IEnumerable<ClassDescriptor> descriptors)
-        {
-            _asmBuilder = asmBuilder;
-            _classDescriptors = descriptors;
-            _moduleBuilder = modBuilder;
-        }
-
-        public void SetEntryPoint(MethodBuilder builder, PEFileKinds kind)
-        {
-            _asmBuilder.SetEntryPoint(builder, kind);
+            AssemblyBuilder = asmBuilder;
+            ClassDescriptors = descriptors;
+            ModuleBuilder = modBuilder;
+            GlobalMethods = globals;
         }
 
         public void Visit(IParseTree tree, TypeBuilder builder)
@@ -67,13 +44,23 @@ namespace NyaLang
         {
             _scopeManager.Push(ScopeLevel.Global);
 
-            foreach(var descriptor in _classDescriptors)
+            foreach(var descriptor in ClassDescriptors)
             {
                 _scopeManager.Push(ScopeLevel.Class);
 
                 _currTypeBuilder = descriptor.Builder;
 
-                VisitChildren(descriptor.Context);
+                foreach (var child in descriptor.Context.children.Where(x =>
+                    !(x is NyaParser.Method_declarationContext) &&
+                    !(x is NyaParser.Interface_method_declarationContext)))
+                {
+                    Visit(child);
+                }
+
+                foreach (var method in descriptor.Methods)
+                {
+                    VisitMethod(method);
+                }
 
                 // TODO: Check constructor visibility
 
@@ -90,12 +77,75 @@ namespace NyaLang
                 Visit(child);
             }
 
-            _moduleBuilder.CreateGlobalFunctions();
+            foreach(var method in GlobalMethods)
+            {
+                 VisitMethod(method);
+            }
+
+            ModuleBuilder.CreateGlobalFunctions();
 
             SetAssemblyVersionInfo();
 
             _scopeManager.Pop();
             return null;
+        }
+
+        private void VisitMethod(MethodDescriptor method)
+        {
+            if (!(method.Context is NyaParser.Method_declarationContext))
+                return;
+
+            var context = (NyaParser.Method_declarationContext)method.Context;
+
+            _scopeManager.Push(ScopeLevel.Method);
+
+            _ilg = method.Builder.GetILGenerator();
+
+            returnLabel = _ilg.DefineLabel();
+
+            var block = context.block();
+
+            if (method.IsConstructor && !method.IsStatic)
+            {
+                _ilg.Emit(OpCodes.Ldarg_0);
+                ConstructorInfo ci = _currTypeBuilder.BaseType.GetConstructor(
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                    null,
+                    new Type[] { },
+                    null
+                    );
+
+                _ilg.Emit(OpCodes.Callvirt, ci);
+                _ilg.Emit(OpCodes.Nop);
+            }
+
+            if (block != null && block.ChildCount > 0)
+            {
+                for(int i = 0; i < method.ParameterTypes.Length; i++)
+                {
+                    _scopeManager.AddVariable(method.Parameters[i].Name, method.Parameters[i], method.ParameterTypes[i]);
+                }
+
+                Visit(block);
+                while (_stackDepth > 0)
+                {
+                    // Clean up after the user
+                    _ilg.Emit(OpCodes.Pop);
+                    _stackDepth--;
+                }
+            }
+            else
+            {
+                // We need to do _something_
+                _ilg.Emit(OpCodes.Nop);
+                _ilg.Emit(OpCodes.Br_S, returnLabel);
+            }
+            _ilg.MarkLabel(returnLabel);
+            _ilg.Emit(OpCodes.Ret);
+
+            _ilg = null;
+
+            _scopeManager.Pop();
         }
 
         public override object VisitClass_declaration([NotNull] NyaParser.Class_declarationContext context)
@@ -108,30 +158,21 @@ namespace NyaLang
             return null;
         }
 
-        private Type FindType(string name, string[] namespaces = null)
+        public override object VisitMethod_declaration([NotNull] NyaParser.Method_declarationContext context)
         {
-            if (namespaces == null)
-                namespaces = _currentUsing ?? new string[] { };
-            Type t = _asmBuilder.GetType(name) ?? Type.GetType(name);
+            return null;
+        }
 
-            if (t == null)
-            {
-                foreach (string ns in namespaces)
-                {
-                    t = _asmBuilder.GetType(ns + '.' + name) ?? Type.GetType(ns + '.' + name);
-                    if (t != null)
-                        break;
-                }
-            }
-
-            return t;
+        public override object VisitInterface_method_declaration([NotNull] NyaParser.Interface_method_declarationContext context)
+        {
+            return null;
         }
 
         private void SetAssemblyVersionInfo()
         {
             // TODO: Others magic assembly stuff
-            AssemblyDetail detail = new AssemblyDetail(_asmBuilder);
-            _asmBuilder.DefineVersionInfoResource();
+            AssemblyDetail detail = new AssemblyDetail(AssemblyBuilder);
+            AssemblyBuilder.DefineVersionInfoResource();
         }
 
         public override object VisitGlobal_attribute([NotNull] NyaParser.Global_attributeContext context)
@@ -157,320 +198,10 @@ namespace NyaLang
 
             if(cInfo != null)
             {
-                _asmBuilder.SetCustomAttribute(new CustomAttributeBuilder(cInfo, conArgs.ToArray()));
+                AssemblyBuilder.SetCustomAttribute(new CustomAttributeBuilder(cInfo, conArgs.ToArray()));
             }
 
             return base.VisitGlobal_attribute(context);
-        }
-
-        public override object VisitMethod_declaration([NotNull] NyaParser.Method_declarationContext context)
-        {
-            // TODO: Break out constructor logic to new method
-
-            string methodName = context.identifier().GetText();
-            bool bIsEntry = false;
-            bool isStatic = context.IsStatic != null;
-            bool isConstructor = methodName == "New";
-
-            _scopeManager.Push(ScopeLevel.Method);
-
-            MethodAttributes methAttrs = MethodAttributes.Private | MethodAttributes.HideBySig;
-
-            if (isStatic)
-            {
-                methAttrs |= MethodAttributes.Static;
-            }
-
-            if (isConstructor)
-            {
-                methodName = isStatic ? ".cctor" : ".ctor";
-                methAttrs |= MethodAttributes.SpecialName;
-            }
-
-            bool isFinal = true;
-
-            foreach (var attr in context.attributes()?.children?
-                .OfType<NyaParser.AttributeContext>() ?? new NyaParser.AttributeContext[] { })
-            {
-                string attrName = attr.identifier().GetText();
-                switch (attrName)
-                {
-                    case "entry":
-                        bIsEntry = true;
-                        break;
-                    case "public":
-                        methAttrs ^= MethodAttributes.Private;
-                        methAttrs |= MethodAttributes.Public;
-                        break;
-                    case "virtual":
-                        methAttrs |= MethodAttributes.Virtual;
-                        break;
-                    case "abstract":
-                        methAttrs |= MethodAttributes.Abstract;
-                        break;
-                }
-            }
-
-            var parameters = context.fixed_parameters()?.children?
-                .OfType<NyaParser.Fixed_parameterContext>() ?? new NyaParser.Fixed_parameterContext[] { };
-
-            Type[] paramTypes = parameters.Select(x => ParseTypeDescriptor(x.type_descriptor())).ToArray();
-            Type returnType = ParseTypeDescriptor(context.type_descriptor());
-
-            MethodInfo baseMethod = FindParentDefinition(_currTypeBuilder, methodName, paramTypes);
-
-            MethodBuilder methodBuilder;
-
-            if(baseMethod != null)
-            {
-                if (baseMethod.IsVirtual && !baseMethod.IsFinal)
-                {
-                    if ((methAttrs & MethodAttributes.Virtual) != MethodAttributes.Virtual)
-                        methAttrs |= MethodAttributes.Final;
-                    methAttrs |= MethodAttributes.Virtual;
-                    if (baseMethod.DeclaringType.IsInterface)
-                        methAttrs |= MethodAttributes.NewSlot;
-
-                    if ((methAttrs & MethodAttributes.Public) != MethodAttributes.Public)
-                        throw new Exception("Oy! This needs to be public!");
-                }
-                if (methodName == ".ctor" && !baseMethod.IsPublic)
-                {
-                    throw new Exception("Oy! The base constructor needs to be public!");
-                }
-            }
-
-            if (_currTypeBuilder != null)
-            {
-                methodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs, returnType, paramTypes);
-            }
-            else
-            {
-                methAttrs |= MethodAttributes.Static;
-                methodBuilder = _moduleBuilder.DefineGlobalMethod(methodName, methAttrs, returnType, paramTypes);
-            }
-
-            for (int i = 0; i < parameters.Count(); i++)
-            {
-                var param = parameters.ElementAt(i);
-                string paramName = param.identifier().GetText();
-
-                ParameterAttributes pAttrs = ParameterAttributes.None;
-
-                ParameterBuilder pb = methodBuilder.DefineParameter(i + 1, pAttrs, paramName);
-                _scopeManager.AddVariable(paramName, pb, paramTypes[i]);
-
-                if (param.Question() != null || param.literal() != null)
-                {
-                    pb.SetCustomAttribute(
-                        new CustomAttributeBuilder(
-                            typeof(OptionalAttribute).GetConstructor(new Type[] { }),
-                            new object[] { })
-                    );
-
-                    if (param.literal() != null)
-                    {
-                        object o = Visit(param.literal());
-
-                        if (o != null)
-                        {
-                            pb.SetConstant(o);
-                        }
-                    }
-                }
-            }
-
-            if (bIsEntry)
-                SetEntryPoint(methodBuilder, PEFileKinds.ConsoleApplication);
-
-            _ilg = methodBuilder.GetILGenerator();
-
-            returnLabel = _ilg.DefineLabel();
-
-            var block = context.block();
-
-            if (isConstructor && !isStatic)
-            {
-                _ilg.Emit(OpCodes.Ldarg_0);
-                ConstructorInfo ci = _currTypeBuilder.BaseType.GetConstructor(
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null,
-                    new Type[] { },
-                    null
-                    );
-
-                _ilg.Emit(OpCodes.Callvirt, ci);
-                _ilg.Emit(OpCodes.Nop);
-            }
-
-            if (block != null && block.ChildCount > 0)
-            {
-                Visit(block);
-                while(_stackDepth > 0)
-                {
-                    // Clean up after the user
-                    _ilg.Emit(OpCodes.Pop);
-                    _stackDepth--;
-                }
-            }
-            else
-            {
-                // We need to do _something_
-                _ilg.Emit(OpCodes.Nop);
-                _ilg.Emit(OpCodes.Br_S, returnLabel);
-            }
-            _ilg.MarkLabel(returnLabel);
-            _ilg.Emit(OpCodes.Ret);
-
-            _ilg = null;
-
-            _scopeManager.Pop();
-
-            return methodBuilder;
-        }
-
-        private MethodInfo FindParentDefinition(Type t, string name, Type[] methodArgs)
-        {
-            if (t == null)
-                return null;
-            MethodInfo info = null;
-            if (t.BaseType != null)
-            {
-                info = _currTypeBuilder.BaseType.GetMethod(name, methodArgs);
-                if (info != null)
-                    return info;
-                info = FindParentDefinition(t.BaseType, name, methodArgs);
-            } else
-            {
-                info = typeof(object).GetMethod(name, methodArgs);
-            }
-            if (info != null)
-                return info;
-
-            foreach(var iface in t.GetInterfaces())
-            {
-                info = iface.GetMethod(name, methodArgs);
-                if (info != null)
-                    return info;
-                info = FindParentDefinition(iface, name, methodArgs);
-                if (info != null)
-                    return info;
-            }
-            return null;
-        }
-
-        public override object VisitInterface_method_declaration([NotNull] NyaParser.Interface_method_declarationContext context)
-        {
-            // TODO: Break out constructor logic to new method
-
-            string methodName = context.identifier().GetText();
-
-            _scopeManager.Push(ScopeLevel.Method);
-
-            MethodAttributes methAttrs = MethodAttributes.Public | MethodAttributes.HideBySig |
-                MethodAttributes.Abstract | MethodAttributes.Virtual | MethodAttributes.NewSlot;
-
-
-            foreach (var attr in context.attributes()?.children?
-                .OfType<NyaParser.AttributeContext>() ?? new NyaParser.AttributeContext[] { })
-            {
-                string attrName = attr.identifier().GetText();
-                switch (attrName)
-                {
-                    case "public":
-                        break;
-                }
-            }
-
-            var parameters = context.fixed_parameters()?.children?
-                .OfType<NyaParser.Fixed_parameterContext>() ?? new NyaParser.Fixed_parameterContext[] { };
-
-            Type[] paramTypes = parameters.Select(x => ParseTypeDescriptor(x.type_descriptor())).ToArray();
-            Type returnType = ParseTypeDescriptor(context.type_descriptor());
-
-            MethodBuilder methodBuilder;
-
-            methodBuilder = _currTypeBuilder.DefineMethod(methodName, methAttrs, returnType, paramTypes);
-
-            for (int i = 0; i < parameters.Count(); i++)
-            {
-                var param = parameters.ElementAt(i);
-                string paramName = param.identifier().GetText();
-
-                ParameterAttributes pAttrs = ParameterAttributes.None;
-
-                ParameterBuilder pb = methodBuilder.DefineParameter(i + 1, pAttrs, paramName);
-                _scopeManager.AddVariable(paramName, pb, paramTypes[i]);
-
-                if (param.Question() != null || param.literal() != null)
-                {
-                    pb.SetCustomAttribute(
-                        new CustomAttributeBuilder(
-                            typeof(OptionalAttribute).GetConstructor(new Type[] { }),
-                            new object[] { })
-                    );
-
-                    if (param.literal() != null)
-                    {
-                        object o = Visit(param.literal());
-
-                        if (o != null)
-                        {
-                            pb.SetConstant(o);
-                        }
-                    }
-                }
-            }
-
-            _scopeManager.Pop();
-
-            return methodBuilder;
-        }
-
-        private Type ParseType(NyaParser.TypeContext context)
-        {
-            Type t = typeof(void);
-            if (context != null)
-            {
-                string typeName = context.identifier().GetText();
-                var typeArgs = new Type[] { };
-
-                if (context.type_argument_list() != null)
-                {
-                    typeArgs = context.type_argument_list().children.OfType<NyaParser.TypeContext>().Select(x => ParseType(x)).ToArray();
-                }
-
-                if (typeAliases.ContainsKey(typeName))
-                {
-                    t = typeAliases[typeName];
-                }
-                else
-                {
-                    if (typeArgs.Length > 0)
-                        typeName += "`" + typeArgs.Length;
-                    t = FindType(typeName, _currentUsing);
-                }
-
-                if( context.type_argument_list() != null)
-                {
-                    t = t.MakeGenericType(typeArgs);
-                }
-
-                if (context.array_type() != null)
-                {
-                    t = t.MakeArrayType();
-                }
-            }
-            return t;
-        }
-
-        private Type ParseTypeDescriptor(NyaParser.Type_descriptorContext context)
-        {
-            if (context != null)
-            {
-                return ParseType(context.type());
-            }
-            return typeof(void);
         }
 
         public override object VisitType_descriptor([NotNull] NyaParser.Type_descriptorContext context)
@@ -593,16 +324,16 @@ namespace NyaLang
 
             switch (sOperator)
             {
-                case "+=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Add, "op_Addition"); break;
-                case "-=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Sub, "op_Subtraction"); break;
-                case "*=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Mul, "op_Multiply"); break;
-                case "/=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Div, "op_Division"); break;
-                case "%=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Rem, "op_Modulus"); break;
-                case "&=": OpHelper.DoMath(_ilg, dst, src, OpCodes.And, "op_BitwiseAnd"); break;
-                case "|=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Or, "op_BitwiseOr"); break;
-                case "^=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Xor, "op_ExclusiveOr"); break;
-                case "<<=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Shl, "op_LeftShift"); break;
-                case ">>=": OpHelper.DoMath(_ilg, dst, src, OpCodes.Shr, "op_RightShift"); break;
+                case "+=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Add, "op_Addition"); break;
+                case "-=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Sub, "op_Subtraction"); break;
+                case "*=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Mul, "op_Multiply"); break;
+                case "/=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Div, "op_Division"); break;
+                case "%=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Rem, "op_Modulus"); break;
+                case "&=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.And, "op_BitwiseAnd"); break;
+                case "|=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Or, "op_BitwiseOr"); break;
+                case "^=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Xor, "op_ExclusiveOr"); break;
+                case "<<=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Shl, "op_LeftShift"); break;
+                case ">>=": TypeHelper.DoMath(_ilg, dst, src, OpCodes.Shr, "op_RightShift"); break;
             }
 
             local.Store(_ilg);
@@ -627,7 +358,7 @@ namespace NyaLang
             Type src = (Type)Visit(context.expression());
             Type dst = local.Type;
 
-            if (!OpHelper.TryConvert(_ilg, src, local.Type))
+            if (!TypeHelper.TryConvert(_ilg, src, local.Type))
                 throw new Exception("Shit's whacked, yo");
 
             _ilg.MarkLabel(nullOp);
@@ -659,7 +390,7 @@ namespace NyaLang
             Type src = (Type)Visit(context.expression());
             Type dst = ParseType(context.type());
 
-            if (!OpHelper.TryConvert(_ilg, src, dst))
+            if (!TypeHelper.TryConvert(_ilg, src, dst))
                 throw new Exception("Shit's whacked, yo");
 
             return dst;
@@ -677,7 +408,7 @@ namespace NyaLang
 
             Type tRight = (Type)Visit(context.expression(1));
 
-            if (!OpHelper.TryConvert(_ilg, tRight, tLeft))
+            if (!TypeHelper.TryConvert(_ilg, tRight, tLeft))
                 throw new Exception("Shit's whacked, yo");
 
             _ilg.MarkLabel(jmp);
@@ -692,13 +423,13 @@ namespace NyaLang
             Type tRight = (Type)Visit(context.expression(1));
 
             if (context.OpMuliply() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Mul, "op_Multiply");
+                TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Mul, "op_Multiply");
 
             if (context.OpDivision() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Div, "op_Division");
+                TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Div, "op_Division");
 
             if (context.OpModulus() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Rem, "op_Modulus");
+                TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Rem, "op_Modulus");
 
             _stackDepth--;
             return tLeft;
@@ -711,10 +442,10 @@ namespace NyaLang
 
 
             if (context.OpAddition() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Add, "op_Addition");
+                TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Add, "op_Addition");
 
             if (context.OpSubtraction() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Sub, "op_Subtraction");
+                TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Sub, "op_Subtraction");
 
             _stackDepth--;
             return tLeft;
@@ -727,10 +458,10 @@ namespace NyaLang
 
 
             if (context.OpLeftShift() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Shl, "op_LeftShift");
+                TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Shl, "op_LeftShift");
 
             if (context.OpRightShift() != null)
-                OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Shr, "op_RightShift");
+                TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Shr, "op_RightShift");
 
             _stackDepth--;
             return tLeft;
@@ -741,7 +472,7 @@ namespace NyaLang
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
-            OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.And, "op_BitwiseAnd");
+            TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.And, "op_BitwiseAnd");
 
             _stackDepth--;
             return tLeft;
@@ -752,7 +483,7 @@ namespace NyaLang
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
-            OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Xor, "op_ExclusiveOr");
+            TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Xor, "op_ExclusiveOr");
 
             _stackDepth--;
             return tLeft;
@@ -763,7 +494,7 @@ namespace NyaLang
             Type tLeft = (Type)Visit(context.expression(0));
             Type tRight = (Type)Visit(context.expression(1));
 
-            OpHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Or, "op_BitwiseOr");
+            TypeHelper.DoMath(_ilg, tLeft, tRight, OpCodes.Or, "op_BitwiseOr");
 
             _stackDepth--;
             return tLeft;
@@ -948,7 +679,7 @@ namespace NyaLang
             {
                 Type t = (Type)Visit(args[i]);
                 if (t != argTypes[i])
-                    OpHelper.TryConvert(_ilg, t, argTypes[i]);
+                    TypeHelper.TryConvert(_ilg, t, argTypes[i]);
             }
         }
     }

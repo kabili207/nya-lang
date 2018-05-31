@@ -21,6 +21,7 @@ namespace NyaLang
         public TypeBuilder Builder { get; set; }
         public NyaParser.AttributesContext Attributes { get; set; }
         public ClassType Type { get; set; }
+        public List<MethodDescriptor> Methods { get; set; }
 
 
         public string FullName

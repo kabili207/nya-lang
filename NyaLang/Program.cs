@@ -51,7 +51,7 @@ namespace NyaLang
             visitor1.Visit(context);
             var descriptors = visitor1.ProcessClasses(moduleBuilder);
 
-            Stage2Visitor visitor2 = new Stage2Visitor(asmBuilder, moduleBuilder, descriptors);
+            Stage2Visitor visitor2 = new Stage2Visitor(asmBuilder, moduleBuilder, descriptors, visitor1.GlobalMethods);
             visitor2.Visit(context);
 
             asmBuilder.Save("NyaTest.exe");

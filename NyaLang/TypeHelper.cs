@@ -1,4 +1,5 @@
-﻿using System;
+﻿using NyaLang.Antlr;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -8,11 +9,19 @@ using System.Threading.Tasks;
 
 namespace NyaLang
 {
-    static class OpHelper
+    static class TypeHelper
     {
         static readonly Type[] signedPrimitives = new[] { typeof(SByte), typeof(Int16), typeof(Int32), typeof(Int64) };
         static readonly Type[] unsignedPrimitives = new[] { typeof(Byte), typeof(UInt16), typeof(UInt32), typeof(UInt64) };
         static readonly Type[] floatingPrimitives = new[] { typeof(Single), typeof(Double) };
+
+        internal static readonly Dictionary<string, Type> TypeAliases = new Dictionary<string, Type>()
+        {
+            { "string", typeof(String) }, { "bool", typeof(Boolean) }, { "float", typeof(Single) }, { "double", typeof(Double) },
+            { "sbyte", typeof(SByte) }, { "short", typeof(Int16) }, { "int", typeof(Int32) }, { "long", typeof(Int64) },
+            { "byte", typeof(Byte) }, { "ushort", typeof(UInt16) }, { "uint", typeof(UInt32) }, { "ulong", typeof(UInt64) },
+            { "decimal", typeof(decimal) }, { "object", typeof(object) }
+        };
 
         static Dictionary<Type, ConversionPair> primitiveMaps = new Dictionary<Type, ConversionPair>();
 
@@ -24,7 +33,7 @@ namespace NyaLang
             //public OpCode[] UnsignedOverflow;
         }
 
-        static OpHelper()
+        static TypeHelper()
         {
             AddPrimitiveMap(typeof(SByte), OpCodes.Conv_I1);
             AddPrimitiveMap(typeof(Int16), OpCodes.Conv_I2);

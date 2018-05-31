@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
@@ -23,9 +24,11 @@ namespace NyaLang
             {
                 if (value is LocalBuilder)
                     return ((LocalBuilder)value).LocalType;
-                if (value is FieldBuilder)
-                   return ((FieldBuilder)value).FieldType;
-                 return type;
+                if (value is FieldInfo)
+                    return ((FieldInfo)value).FieldType;
+                if (value is ParameterInfo)
+                    return ((ParameterInfo)value).ParameterType;
+                return type;
             }
             set
             {
@@ -37,8 +40,10 @@ namespace NyaLang
         {
             if (value is LocalBuilder)
                 ilg.Emit(OpCodes.Ldloc, (LocalBuilder)value);
-            if (value is FieldBuilder)
-                ilg.Emit(OpCodes.Ldfld, (FieldBuilder)value);
+            if (value is FieldInfo)
+                ilg.Emit(OpCodes.Ldfld, (FieldInfo)value);
+            if (value is ParameterInfo)
+                ilg.Emit(OpCodes.Ldarg, ((ParameterInfo)value).Position);
             if (value is ParameterBuilder)
                 ilg.Emit(OpCodes.Ldarg, ((ParameterBuilder)value).Position);
         }
@@ -47,8 +52,10 @@ namespace NyaLang
         {
             if (value is LocalBuilder)
                 ilg.Emit(OpCodes.Stloc, (LocalBuilder)value);
-            if (value is FieldBuilder)
-                ilg.Emit(OpCodes.Stfld, (FieldBuilder)value);
+            if (value is FieldInfo)
+                ilg.Emit(OpCodes.Stfld, (FieldInfo)value);
+            if (value is ParameterInfo)
+                ilg.Emit(OpCodes.Starg, ((ParameterInfo)value).Position);
             if (value is ParameterBuilder)
                 ilg.Emit(OpCodes.Starg, ((ParameterBuilder)value).Position);
         }
@@ -63,12 +70,22 @@ namespace NyaLang
             return new Variable(d);
         }
 
-        public static implicit operator FieldBuilder(Variable d)
+        public static implicit operator FieldInfo(Variable d)
         {
-            return (FieldBuilder)d.value;
+            return (FieldInfo)d.value;
         }
 
-        public static implicit operator Variable(FieldBuilder d)
+        public static implicit operator Variable(FieldInfo d)
+        {
+            return new Variable(d);
+        }
+
+        public static implicit operator ParameterInfo(Variable d)
+        {
+            return (ParameterInfo)d.value;
+        }
+
+        public static implicit operator Variable(ParameterInfo d)
         {
             return new Variable(d);
         }
